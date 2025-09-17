@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ../backend
+      dockerfile: backend.Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      LOG_LEVEL: INFO
+      BACKEND_PORT: 8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mirakl-network
+
+  # Portal de pruebas
+  portal:
+    image: node:18-alpine
+    container_name: mirakl-portal
+    ports:
+      - "3000:3000"
+    working_dir: /app
+    volumes:
+      - ../tests:/app
+    command: sh -c "npm install express cors && node portal-server.js"
+    networks:
+      - mirakl-network
+
+  # Build de extensión
+  extension-build:
+    build:
+      context: ../extension
+      dockerfile: ../docker/extension.Dockerfile
+    volumes:
+      - ../extension/dist:/app/dist
+    networks:
+      - mirakl-network
+
+networks:
+  mirakl-network:
+    driver: bridge

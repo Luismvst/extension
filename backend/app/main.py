@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.logging import setup_logging
 from app.core.settings import get_settings
-from app.api.routers import health, map_router, ship_router, tracking_router
+from app.api import health, map_router, ship_router, tracking_router
 
 # Setup logging
 setup_logging()
@@ -56,9 +56,9 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
-    app.include_router(map_router, prefix="/api/v1", tags=["mapping"])
-    app.include_router(ship_router, prefix="/api/v1", tags=["shipping"])
-    app.include_router(tracking_router, prefix="/api/v1", tags=["tracking"])
+    app.include_router(map_router.router, prefix="/api/v1", tags=["mapping"])
+    app.include_router(ship_router.router, prefix="/api/v1", tags=["shipping"])
+    app.include_router(tracking_router.router, prefix="/api/v1", tags=["tracking"])
 
     return app
 

@@ -71,6 +71,8 @@ app.get('/', (req, res) => {
                 font-size: 16px;
                 margin: 10px 5px;
                 transition: background-color 0.3s;
+                text-decoration: none;
+                display: inline-block;
             }
             .export-button:hover {
                 background: #45a049;
@@ -131,9 +133,9 @@ app.get('/', (req, res) => {
         <div class="marketplace">
             <h3>🏪 Carrefour Marketplace</h3>
             <p>Sample orders: 2 orders (1 PENDING, 1 ACCEPTED)</p>
-            <button class="export-button" data-export-csv data-url="/api/export/carrefour">
+            <a href="/api/export/carrefour" class="export-button" data-export-csv>
                 📊 Export CSV
-            </button>
+            </a>
             <button class="export-button" data-csv data-href="/api/export/carrefour">
                 📈 Download Orders
             </button>
@@ -142,9 +144,9 @@ app.get('/', (req, res) => {
         <div class="marketplace">
             <h3>🔨 Leroy Merlin Marketplace</h3>
             <p>Sample orders: 1 order (1 SHIPPED)</p>
-            <button class="export-button" data-export-csv data-url="/api/export/leroy">
+            <a href="/api/export/leroy" class="export-button" data-export-csv>
                 📊 Export CSV
-            </button>
+            </a>
             <button class="export-button" data-csv data-href="/api/export/leroy">
                 📈 Download Orders
             </button>
@@ -153,9 +155,9 @@ app.get('/', (req, res) => {
         <div class="marketplace">
             <h3>🏠 Adeo Marketplace</h3>
             <p>Sample orders: 1 order (1 PENDING)</p>
-            <button class="export-button" data-export-csv data-url="/api/export/adeo">
+            <a href="/api/export/adeo" class="export-button" data-export-csv>
                 📊 Export CSV
-            </button>
+            </a>
             <button class="export-button" data-csv data-href="/api/export/adeo">
                 📈 Download Orders
             </button>
