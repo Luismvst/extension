@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: mirakl-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=development
+      - BACKEND_PORT=8080
+    volumes:
+      - ../backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mirakl-network
+
+  extension_build:
+    build:
+      context: ..
+      dockerfile: docker/extension.Dockerfile
+    container_name: mirakl-extension-build
+    volumes:
+      - ../extension/dist:/artifacts/dist
+    networks:
+      - mirakl-network
+    profiles:
+      - build
+
+  # Development services
+  redis:
+    image: redis:7-alpine
+    container_name: mirakl-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mirakl-network
+    profiles:
+      - dev
+
+  # Database for future use
+  postgres:
+    image: postgres:15-alpine
+    container_name: mirakl-postgres
+    environment:
+      - POSTGRES_DB=mirakl
+      - POSTGRES_USER=mirakl
+      - POSTGRES_PASSWORD=mirakl123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mirakl-network
+    profiles:
+      - dev
+
+networks:
+  mirakl-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  postgres_data:

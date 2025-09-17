@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '0.1.0'
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install pnpm
+      run: npm install -g pnpm
+      
+    - name: Install extension dependencies
+      working-directory: ./extension
+      run: pnpm install --frozen-lockfile
+      
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        
+    - name: Build extension
+      working-directory: ./extension
+      run: pnpm build
+      
+    - name: Run tests
+      run: |
+        cd extension && pnpm test
+        cd ../backend && pytest
+        
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create release archive
+      run: |
+        mkdir -p release
+        cp -r extension/dist release/extension
+        cp -r backend release/backend
+        cp -r docker release/docker
+        cp -r docs release/docs
+        cp README.md release/
+        cp LICENSE release/
+        cp Makefile release/
+        cp env.example release/
+        
+        cd release
+        zip -r ../mirakl-csv-extension-${{ steps.version.outputs.version }}.zip .
+        cd ..
+        
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        release_name: Mirakl CSV Extension ${{ steps.version.outputs.version }}
+        body: |
+          ## 🚀 Mirakl CSV Extension ${{ steps.version.outputs.version }}
+          
+          ### ✨ Features
+          - Chrome Extension MV3 for CSV interception
+          - FastAPI backend with TIPSA mapping
+          - Docker containerization
+          - Comprehensive testing suite
+          - CI/CD pipeline
+          
+          ### 📦 Downloads
+          - **Extension**: Ready to load in Chrome
+          - **Backend**: Docker image available
+          - **Source**: Complete source code
+          
+          ### 🛠️ Installation
+          1. Download the extension zip file
+          2. Extract to your desired location
+          3. Load unpacked extension in Chrome
+          4. Start the backend with Docker Compose
+          
+          ### 📋 Changelog
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          
+          ### 🔗 Links
+          - [Documentation](docs/README.md)
+          - [Architecture](docs/ARCHITECTURE.md)
+          - [Issues](https://github.com/Luismvst/extension/issues)
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
+        
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: mirakl-csv-extension-${{ steps.version.outputs.version }}.zip
+        asset_name: mirakl-csv-extension-${{ steps.version.outputs.version }}.zip
+        asset_content_type: application/zip
+        
+    - name: Upload Extension as separate asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: extension/dist/
+        asset_name: extension-chrome-${{ steps.version.outputs.version }}.zip
+        asset_content_type: application/zip
+        
+    - name: Update CHANGELOG
+      run: |
+        # This would typically update the CHANGELOG.md file
+        # For now, we'll just echo the version
+        echo "Release ${{ steps.version.outputs.version }} created successfully!"
+        
+    - name: Notify success
+      run: |
+        echo "🎉 Release ${{ steps.version.outputs.version }} created successfully!"
+        echo "📦 Extension and backend artifacts uploaded"
+        echo "🔗 Release URL: ${{ steps.create_release.outputs.html_url }}"

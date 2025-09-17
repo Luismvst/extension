@@ -1,0 +1,6 @@
+Order ID,Order Date,Status,SKU,Product,Qty,Price,Buyer Name,Buyer Email,Phone,Ship To,Address 1,Address 2,City,Postal Code,Country,Total
+ORD-001,2024-01-15,PENDING,SKU-123,Product A,2,25.50,John Doe,john@example.com,+34123456789,John Doe,123 Main St,Apt 4B,Madrid,28001,ES,51.00
+ORD-002,2024-01-15,ACCEPTED,SKU-456,Product B,1,45.00,Jane Smith,jane@example.com,+34987654321,Jane Smith,456 Oak Ave,,Barcelona,08001,ES,45.00
+ORD-003,2024-01-15,SHIPPED,SKU-789,Product C,3,15.75,Bob Johnson,bob@example.com,+34111222333,Bob Johnson,789 Pine St,Floor 2,Valencia,46001,ES,47.25
+ORD-004,2024-01-15,DELIVERED,SKU-101,Product D,1,89.99,Alice Brown,alice@example.com,+34444555666,Alice Brown,101 Elm St,,Seville,41001,ES,89.99
+ORD-005,2024-01-15,CANCELLED,SKU-202,Product E,2,12.50,Charlie Wilson,charlie@example.com,+34555666777,Charlie Wilson,202 Oak St,,Bilbao,48001,ES,25.00
