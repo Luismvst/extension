@@ -48,6 +48,18 @@ services:
     depends_on:
       - backend
 
+  # Chrome Extension Build
+  extension:
+    build:
+      context: ./extension
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./extension/dist:/app/dist
+    networks:
+      - mirakl-network
+    depends_on:
+      - backend
+
 networks:
   mirakl-network:
     driver: bridge

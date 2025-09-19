@@ -12,10 +12,12 @@ help:
 	@echo "  make logs             - Ver logs de todos los servicios"
 	@echo "  make clean            - Limpiar contenedores e imágenes"
 	@echo "  make test             - Ejecutar tests"
+	@echo "  make test-e2e         - Ejecutar tests E2E con Playwright"
 	@echo "  make install-extension - Instalar dependencias de la extensión"
 	@echo "  make build-extension  - Construir la extensión"
 	@echo "  make backend-only     - Solo backend"
 	@echo "  make demo-only        - Solo sitios de demostración"
+	@echo "  make ci               - Ejecutar pipeline CI completo"
 	@echo ""
 
 # Levantar todos los servicios
@@ -131,3 +133,26 @@ health:
 	@curl -s http://localhost:3001/api/status | jq . || echo "❌ TIPSA Demo no disponible"
 	@echo "Mirakl Demo:"
 	@curl -s http://localhost:3002/api/orders | jq . || echo "❌ Mirakl Demo no disponible"
+
+# Tests E2E con Playwright
+test-e2e:
+	@echo "🧪 Ejecutando tests E2E..."
+	docker-compose up -d
+	@sleep 30
+	cd tests && npm install && npx playwright install && npx playwright test
+	docker-compose down
+	@echo "✅ Tests E2E completados"
+
+# Pipeline CI completo
+ci:
+	@echo "🔄 Ejecutando pipeline CI completo..."
+	@echo "1. Construyendo imágenes..."
+	docker-compose build
+	@echo "2. Levantando servicios..."
+	docker-compose up -d
+	@sleep 30
+	@echo "3. Ejecutando tests E2E..."
+	cd tests && npm install && npx playwright install && npx playwright test
+	@echo "4. Parando servicios..."
+	docker-compose down
+	@echo "✅ Pipeline CI completado"

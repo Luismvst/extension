@@ -144,8 +144,22 @@ export class StorageManager {
     await chrome.storage.local.clear()
   }
 
+  // Queue management
+  static async getOrdersQueue(): Promise<any[]> {
+    const result = await chrome.storage.local.get(['ordersQueue'])
+    return result.ordersQueue || []
+  }
+
+  static async setOrdersQueue(orders: any[]): Promise<void> {
+    await chrome.storage.local.set({ ordersQueue: orders })
+  }
+
+  static async clearOrdersQueue(): Promise<void> {
+    await chrome.storage.local.remove(['ordersQueue'])
+  }
+
   // Storage info
-  static async getStorageInfo(): Promise<chrome.storage.StorageArea> {
+  static async getStorageInfo(): Promise<number> {
     return await chrome.storage.local.getBytesInUse()
   }
 

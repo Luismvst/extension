@@ -1,12 +1,12 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with legacy peer deps to avoid conflicts
-RUN npm install --legacy-peer-deps
+# Install dependencies
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -14,4 +14,8 @@ COPY . .
 # Build the extension
 RUN npm run build
 
-# The built extension will be in /app/dist
+# Expose port for development server (optional)
+EXPOSE 3000
+
+# Default command
+CMD ["npm", "run", "build"]
