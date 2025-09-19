@@ -11,7 +11,7 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the extension
+# Build the extension (updated for auto-auth)
 RUN npm run build
 
 # Copy built files to dist directory

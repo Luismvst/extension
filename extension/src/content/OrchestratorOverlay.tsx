@@ -65,6 +65,17 @@ const OrchestratorOverlay: React.FC = () => {
     try {
       const state = await StorageManager.getAppState()
       setAppState(prev => ({ ...prev, ...state }))
+      
+      // Auto-authenticate with extension token if not already authenticated
+      if (!apiClient.isAuthenticated()) {
+        try {
+          await apiClient.getExtensionToken()
+          setAppState(prev => ({ ...prev, isAuthenticated: true }))
+          console.log('Auto-authenticated with extension token')
+        } catch (err) {
+          console.error('Failed to auto-authenticate:', err)
+        }
+      }
     } catch (err) {
       console.error('Failed to load initial state:', err)
     }
