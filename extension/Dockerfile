@@ -14,6 +14,9 @@ COPY . .
 # Build the extension
 RUN npm run build
 
+# Copy built files to dist directory
+RUN cp -r dist/* /app/dist/ || true
+
 # Expose port for development server (optional)
 EXPOSE 3000
 
