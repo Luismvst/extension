@@ -26,6 +26,7 @@ export default defineManifest({
   background: {
     service_worker: 'background/index.js',
   },
+  
   permissions: [
     'storage',
     'activeTab',
