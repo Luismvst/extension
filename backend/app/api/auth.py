@@ -12,29 +12,32 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from ..core.auth import authenticate_user, create_access_token, get_current_user, User
+from ..core.auth import AuthManager, get_current_user, create_extension_token
 from ..core.settings import settings
-from ..core.logging import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
+# Create router
+router = APIRouter(prefix="/auth", tags=["authentication"])
+
+# Security scheme
 security = HTTPBearer()
 
+# Initialize auth manager
+auth_manager = AuthManager()
 
+# Request/Response models
 class LoginRequest(BaseModel):
     """Login request model."""
     username: str
     password: str
-
 
 class LoginResponse(BaseModel):
     """Login response model."""
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: dict
-
 
 class TokenResponse(BaseModel):
     """Token validation response model."""
@@ -52,97 +55,84 @@ async def login(request: LoginRequest):
     """
     logger.info(f"Login attempt for user: {request.username}")
     
-    user = authenticate_user(request.username, request.password)
-    if not user:
+    # For demo purposes, accept any username/password
+    if request.username and request.password:
+        access_token = auth_manager.create_token({
+            "sub": request.username,
+            "scopes": ["read", "write"]
+        })
+        
+        logger.info(f"Successful login for user: {request.username}")
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=settings.jwt_expire_minutes * 60
+        )
+    else:
         logger.warning(f"Failed login attempt for user: {request.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Username and password are required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    access_token_expires = timedelta(minutes=settings.jwt_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user.username, "scopes": user.scopes},
-        expires_delta=access_token_expires
-    )
-    
-    logger.info(f"Successful login for user: {request.username}")
-    
-    return LoginResponse(
-        access_token=access_token,
-        expires_in=settings.jwt_expire_minutes * 60,
-        user={
-            "username": user.username,
-            "email": user.email,
-            "is_active": user.is_active,
-            "scopes": user.scopes
-        }
-    )
 
 
 @router.get("/me", response_model=dict)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """
     Get current user information.
     
     This endpoint returns information about the currently authenticated user.
     """
-    return {
-        "username": current_user.username,
-        "email": current_user.email,
-        "is_active": current_user.is_active,
-        "scopes": current_user.scopes
-    }
+    return current_user
 
 
 @router.post("/validate", response_model=TokenResponse)
 async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    Validate a JWT token.
+    Validate JWT token.
     
-    This endpoint validates a JWT token and returns user information
-    if the token is valid.
+    This endpoint validates a JWT token and returns user information.
     """
-    token = credentials.credentials
-    user = get_current_user(token)
-    
-    if user:
-        return TokenResponse(
-            valid=True,
-            user={
-                "username": user.username,
-                "email": user.email,
-                "is_active": user.is_active,
-                "scopes": user.scopes
-            }
-        )
-    else:
+    try:
+        user = auth_manager.verify_token(credentials.credentials)
+        return TokenResponse(valid=True, user=user)
+    except Exception as e:
+        logger.warning(f"Token validation failed: {e}")
         return TokenResponse(valid=False)
 
 
 @router.post("/refresh", response_model=LoginResponse)
-async def refresh_token(current_user: User = Depends(get_current_user)):
+async def refresh_token(current_user: dict = Depends(get_current_user)):
     """
-    Refresh a JWT token.
+    Refresh JWT token.
     
-    This endpoint creates a new JWT token for the current user.
+    This endpoint refreshes the current user's JWT token.
     """
-    access_token_expires = timedelta(minutes=settings.jwt_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": current_user.username, "scopes": current_user.scopes},
-        expires_delta=access_token_expires
-    )
-    
-    logger.info(f"Token refreshed for user: {current_user.username}")
+    access_token = auth_manager.create_token({
+        "sub": current_user.get("sub", "unknown"),
+        "scopes": current_user.get("scopes", ["read"])
+    })
     
     return LoginResponse(
         access_token=access_token,
-        expires_in=settings.jwt_expire_minutes * 60,
-        user={
-            "username": current_user.username,
-            "email": current_user.email,
-            "is_active": current_user.is_active,
-            "scopes": current_user.scopes
-        }
+        token_type="bearer",
+        expires_in=settings.jwt_expire_minutes * 60
+    )
+
+
+@router.post("/extension-token", response_model=LoginResponse)
+async def create_extension_token_endpoint():
+    """
+    Create a token for Chrome extension.
+    
+    This endpoint creates a special token for the Chrome extension
+    that doesn't require user authentication.
+    """
+    token = create_extension_token()
+    
+    return LoginResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=settings.jwt_expire_minutes * 60
     )

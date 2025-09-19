@@ -25,6 +25,10 @@ RUN mkdir -p /app/dist/content && \
         cp src/content/styles.css /app/dist/content/styles.css; \
     fi
 
+# Copy HTML files to root directory
+RUN cp /app/dist/src/popup/index.html /app/dist/popup.html && \
+    cp /app/dist/src/options/index.html /app/dist/options.html
+
 # Expose port for development server (optional)
 EXPOSE 3000
 

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # Import routers
-from .api import marketplaces, carriers, orchestrator, health
+from .api import marketplaces, carriers, orchestrator, health, auth
 
 # Configure logging
 import logging
@@ -81,6 +81,7 @@ async def root():
 
 # Include routers
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(marketplaces.router)
 app.include_router(carriers.router)
 app.include_router(orchestrator.router)

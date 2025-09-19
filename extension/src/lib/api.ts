@@ -66,7 +66,7 @@ class ApiClient {
   // Authentication
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response: AxiosResponse<LoginResponse> = await this.client.post(
-      '/api/v1/auth/login',
+      '/auth/login',
       credentials
     )
     
@@ -75,17 +75,26 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<any> {
-    const response = await this.client.get('/api/v1/auth/me')
+    const response = await this.client.get('/auth/me')
     return response.data
   }
 
   async validateToken(): Promise<boolean> {
     try {
-      await this.client.post('/api/v1/auth/validate')
+      await this.client.post('/auth/validate')
       return true
     } catch {
       return false
     }
+  }
+
+  async getExtensionToken(): Promise<LoginResponse> {
+    const response: AxiosResponse<LoginResponse> = await this.client.post(
+      '/auth/extension-token'
+    )
+    
+    this.setAuthToken(response.data.access_token)
+    return response.data
   }
 
   // Marketplace operations
