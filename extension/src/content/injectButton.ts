@@ -1,4 +1,4 @@
-import { sendMessage } from '@/common/messages'
+// import { sendMessage } from '@/common/messages'
 
 /**
  * Inject floating button for CSV export
@@ -153,7 +153,9 @@ export class FloatingExportButton {
 
       // Trigger the first export element
       const firstElement = exportElements[0]
-      firstElement.click()
+      if (firstElement instanceof HTMLElement) {
+        firstElement.click()
+      }
 
       // Show success message
       this.button.innerHTML = '✅ Exported!'

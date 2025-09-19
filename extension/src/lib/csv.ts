@@ -108,7 +108,7 @@ function parseDate(dateStr: string): string {
       'MM-DD-YYYY'
     ]
 
-    for (const format of formats) {
+    for (const _format of formats) {
       try {
         const date = new Date(dateStr)
         if (!isNaN(date.getTime())) {

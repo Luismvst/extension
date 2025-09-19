@@ -1,184 +1,133 @@
-# Mirakl CSV Extension - Makefile
+# Mirakl-TIPSA Orchestrator Makefile
 
-.PHONY: help install build test clean up down logs shell
+.PHONY: help build up down logs clean test install-extension
 
 # Default target
 help:
-	@echo "Mirakl CSV Extension - Available commands:"
+	@echo "Mirakl-TIPSA Orchestrator - Comandos disponibles:"
 	@echo ""
-	@echo "Development:"
-	@echo "  install     - Install all dependencies"
-	@echo "  build       - Build all components"
-	@echo "  test        - Run all tests"
-	@echo "  clean       - Clean build artifacts"
+	@echo "  make up              - Levantar todos los servicios"
+	@echo "  make down            - Parar todos los servicios"
+	@echo "  make build           - Construir todas las imágenes"
+	@echo "  make logs             - Ver logs de todos los servicios"
+	@echo "  make clean            - Limpiar contenedores e imágenes"
+	@echo "  make test             - Ejecutar tests"
+	@echo "  make install-extension - Instalar dependencias de la extensión"
+	@echo "  make build-extension  - Construir la extensión"
+	@echo "  make backend-only     - Solo backend"
+	@echo "  make demo-only        - Solo sitios de demostración"
 	@echo ""
-	@echo "Docker:"
-	@echo "  up          - Start all services"
-	@echo "  up-dev      - Start development services"
-	@echo "  down        - Stop all services"
-	@echo "  logs        - Show logs"
-	@echo "  shell       - Open shell in backend container"
-	@echo ""
-	@echo "Extension:"
-	@echo "  build-ext   - Build extension only"
-	@echo "  test-ext    - Test extension only"
-	@echo ""
-	@echo "Backend:"
-	@echo "  build-backend - Build backend only"
-	@echo "  test-backend  - Test backend only"
-	@echo "  run-backend   - Run backend locally"
 
-# Install dependencies
-install:
-	@echo "Installing dependencies..."
-	cd extension && pnpm install
-	cd backend && pip install -e .
-
-# Build all components
-build: build-ext build-backend
-
-# Build extension
-build-ext:
-	@echo "Building extension..."
-	cd extension && pnpm build
-
-# Build backend
-build-backend:
-	@echo "Building backend..."
-	cd backend && python -m pip install -e .
-
-# Run all tests
-test: test-ext test-backend
-
-# Test extension
-test-ext:
-	@echo "Testing extension..."
-	cd extension && pnpm test
-
-# Test backend
-test-backend:
-	@echo "Testing backend..."
-	cd backend && pytest
-
-# Clean build artifacts
-clean:
-	@echo "Cleaning build artifacts..."
-	rm -rf extension/dist
-	rm -rf backend/build
-	rm -rf backend/dist
-	rm -rf backend/*.egg-info
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
-
-# Docker commands
+# Levantar todos los servicios
 up:
-	@echo "Starting all services..."
-	docker-compose -f docker/docker-compose.yml up -d
+	@echo "🚀 Levantando Mirakl-TIPSA Orchestrator..."
+	docker-compose up -d
+	@echo "✅ Servicios levantados:"
+	@echo "   - Backend API: http://localhost:8080"
+	@echo "   - TIPSA Demo: http://localhost:3001"
+	@echo "   - Mirakl Demo: http://localhost:3002"
+	@echo "   - API Docs: http://localhost:8080/docs"
 
-up-dev:
-	@echo "Starting development services..."
-	docker-compose -f docker/docker-compose.yml --profile dev up -d
-
+# Parar todos los servicios
 down:
-	@echo "Stopping all services..."
-	docker-compose -f docker/docker-compose.yml down
+	@echo "🛑 Parando servicios..."
+	docker-compose down
+	@echo "✅ Servicios parados"
 
+# Construir todas las imágenes
+build:
+	@echo "🔨 Construyendo imágenes..."
+	docker-compose build
+	@echo "✅ Imágenes construidas"
+
+# Ver logs
 logs:
-	@echo "Showing logs..."
-	docker-compose -f docker/docker-compose.yml logs -f
+	@echo "📋 Mostrando logs..."
+	docker-compose logs -f
 
-shell:
-	@echo "Opening shell in backend container..."
-	docker-compose -f docker/docker-compose.yml exec backend /bin/bash
+# Limpiar contenedores e imágenes
+clean:
+	@echo "🧹 Limpiando..."
+	docker-compose down -v
+	docker system prune -f
+	@echo "✅ Limpieza completada"
 
-# Build extension with Docker
-build-ext-docker:
-	@echo "Building extension with Docker..."
-	docker-compose -f docker/docker-compose.yml --profile build run --rm extension_build
+# Solo backend
+backend-only:
+	@echo "🚀 Levantando solo el backend..."
+	docker-compose up -d backend
+	@echo "✅ Backend levantado en http://localhost:8080"
 
-# Run backend locally
-run-backend:
-	@echo "Running backend locally..."
-	cd backend && uvicorn app.main:app --reload --port 8080
+# Solo demos
+demo-only:
+	@echo "🚀 Levantando sitios de demostración..."
+	docker-compose up -d tipsa-demo mirakl-demo
+	@echo "✅ Demos levantados:"
+	@echo "   - TIPSA Demo: http://localhost:3001"
+	@echo "   - Mirakl Demo: http://localhost:3002"
 
-# Development setup
-dev-setup: install
-	@echo "Setting up development environment..."
-	cp env.example .env
-	@echo "Development setup complete!"
-	@echo "Run 'make up-dev' to start development services"
+# Instalar dependencias de la extensión
+install-extension:
+	@echo "📦 Instalando dependencias de la extensión..."
+	cd extension && npm install
+	@echo "✅ Dependencias instaladas"
 
-# Production build
-prod-build:
-	@echo "Building for production..."
-	docker-compose -f docker/docker-compose.yml build --no-cache
+# Construir la extensión
+build-extension: install-extension
+	@echo "🔨 Construyendo extensión..."
+	cd extension && npm run build
+	@echo "✅ Extensión construida en extension/dist/"
 
-# CI/CD commands
-ci-test:
-	@echo "Running CI tests..."
-	make test-ext
-	make test-backend
+# Ejecutar tests
+test:
+	@echo "🧪 Ejecutando tests..."
+	@echo "Backend tests:"
+	cd backend && python -m pytest tests/ -v
+	@echo "Extension tests:"
+	cd extension && npm test
+	@echo "✅ Tests completados"
 
-ci-build:
-	@echo "Running CI build..."
-	make build-ext
-	make build-backend
+# Desarrollo completo
+dev: build up install-extension build-extension
+	@echo "🎉 Entorno de desarrollo listo!"
+	@echo ""
+	@echo "Próximos pasos:"
+	@echo "1. Cargar la extensión en Chrome desde extension/dist/"
+	@echo "2. Visitar http://localhost:3001 para probar TIPSA"
+	@echo "3. Visitar http://localhost:3002 para probar Mirakl"
+	@echo "4. Usar http://localhost:8080/docs para la API"
 
-# Extension specific
-extension-dev:
-	@echo "Starting extension development server..."
-	cd extension && pnpm dev
-
-extension-test-e2e:
-	@echo "Running extension E2E tests..."
-	cd extension && pnpm test:e2e
-
-# Backend specific
-backend-dev:
-	@echo "Starting backend development server..."
-	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-
-backend-test-cov:
-	@echo "Running backend tests with coverage..."
-	cd backend && pytest --cov=app --cov-report=html --cov-report=term
-
-# Database commands (for future use)
-db-migrate:
-	@echo "Running database migrations..."
-	# Add migration commands here
-
-db-reset:
-	@echo "Resetting database..."
-	# Add database reset commands here
-
-# Utility commands
+# Verificar estado
 status:
-	@echo "Checking service status..."
-	docker-compose -f docker/docker-compose.yml ps
+	@echo "📊 Estado de los servicios:"
+	docker-compose ps
 
+# Reiniciar servicios
 restart:
-	@echo "Restarting services..."
-	docker-compose -f docker/docker-compose.yml restart
+	@echo "🔄 Reiniciando servicios..."
+	docker-compose restart
+	@echo "✅ Servicios reiniciados"
 
-# Help for specific targets
-help-ext:
-	@echo "Extension commands:"
-	@echo "  build-ext      - Build extension"
-	@echo "  test-ext       - Test extension"
-	@echo "  extension-dev  - Start extension dev server"
-	@echo "  extension-test-e2e - Run E2E tests"
+# Backup de logs
+backup-logs:
+	@echo "💾 Creando backup de logs..."
+	mkdir -p backups
+	tar -czf backups/logs-$(shell date +%Y%m%d-%H%M%S).tar.gz logs/
+	@echo "✅ Backup creado en backups/"
 
-help-backend:
-	@echo "Backend commands:"
-	@echo "  build-backend    - Build backend"
-	@echo "  test-backend     - Test backend"
-	@echo "  backend-dev      - Start backend dev server"
-	@echo "  backend-test-cov - Run tests with coverage"
+# Actualizar dependencias
+update-deps:
+	@echo "🔄 Actualizando dependencias..."
+	cd backend && pip install --upgrade pip && pip install -e .[dev]
+	cd extension && npm update
+	@echo "✅ Dependencias actualizadas"
 
-help-docker:
-	@echo "Docker commands:"
-	@echo "  up        - Start all services"
-	@echo "  up-dev    - Start development services"
-	@echo "  down      - Stop all services"
-	@echo "  logs      - Show logs"
-	@echo "  shell     - Open shell in backend"
+# Verificar salud
+health:
+	@echo "🏥 Verificando salud de los servicios..."
+	@echo "Backend:"
+	@curl -s http://localhost:8080/api/v1/health/ | jq . || echo "❌ Backend no disponible"
+	@echo "TIPSA Demo:"
+	@curl -s http://localhost:3001/api/status | jq . || echo "❌ TIPSA Demo no disponible"
+	@echo "Mirakl Demo:"
+	@curl -s http://localhost:3002/api/orders | jq . || echo "❌ Mirakl Demo no disponible"

@@ -1,55 +1,38 @@
 {
-  "name": "mirakl-csv-extension",
-  "version": "0.1.0",
-  "description": "Chrome extension to intercept Mirakl CSV exports and generate TIPSA-compatible files",
+  "name": "mirakl-tipsa-orchestrator-extension",
+  "version": "0.2.0",
+  "description": "Chrome extension for orchestrating Mirakl orders to TIPSA carrier",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "jest",
-    "test:e2e": "playwright test",
-    "test:watch": "jest --watch",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint . --ext ts,tsx --fix",
     "type-check": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint": "eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "papaparse": "^5.4.1",
-    "zod": "^3.22.4",
-    "lucide-react": "^0.294.0"
+    "@mui/material": "^5.15.0",
+    "@mui/icons-material": "^5.15.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "axios": "^1.6.0",
+    "zod": "^3.22.0",
+    "date-fns": "^2.30.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@types/papaparse": "^5.3.14",
-    "@types/chrome": "^0.0.251",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/chrome": "^0.0.250",
+    "@vitejs/plugin-react": "^4.2.0",
+    "@crxjs/vite-plugin": "^2.0.0-beta.21",
+    "typescript": "^5.2.0",
+    "vite": "^5.0.0",
+    "eslint": "^8.55.0",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
-    "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
-    "jest": "^29.7.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/jest-dom": "^6.1.5",
-    "jest-environment-jsdom": "^29.7.0",
-    "ts-jest": "^29.1.1",
-    "playwright": "^1.40.1",
-    "@playwright/test": "^1.40.1",
-    "postcss": "^8.4.32",
-    "prettier": "^3.1.1",
-    "tailwindcss": "^3.3.6",
-    "typescript": "^5.2.2",
-    "vite": "^4.5.0",
-    "vite-plugin-static-copy": "^0.16.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "eslint-plugin-react-refresh": "^0.4.5"
   }
 }

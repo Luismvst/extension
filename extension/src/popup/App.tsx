@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { OrderStandard } from '@/common/types'
-import { getQueue, clearQueue, generateTIPSA } from '@/common/messages'
+import { getQueue, clearQueue } from '@/common/messages'
 import { exportTIPSACSV } from '@/mappers/tipsa'
-import { Download, Trash2, RefreshCw, FileText, Package } from 'lucide-react'
+import { Download, Trash2, RefreshCw, Package } from 'lucide-react'
 
 /**
  * Main popup component for the Mirakl CSV Extension
@@ -36,7 +36,7 @@ export default function App() {
       
       const response = await getQueue()
       setOrders(response.orders || [])
-      setStats(response.stats || {
+      setStats((response as any).stats || {
         total: 0,
         byStatus: {
           PENDING: 0,

@@ -1,214 +1,156 @@
-import { OrderStandard, STORAGE_KEYS } from '@/common/types'
-
 /**
- * Light obfuscation for sensitive data
+ * Chrome storage utilities for the extension.
  */
-function obfuscateData(data: any): any {
-  if (typeof data === 'string') {
-    // Simple obfuscation - replace middle characters with *
-    if (data.length > 4) {
-      const start = data.substring(0, 2)
-      const end = data.substring(data.length - 2)
-      const middle = '*'.repeat(Math.max(0, data.length - 4))
-      return `${start}${middle}${end}`
-    }
-    return data
-  }
-  
-  if (typeof data === 'object' && data !== null) {
-    const obfuscated = { ...data }
-    // Obfuscate specific fields
-    if (obfuscated.email) {
-      obfuscated.email = obfuscateData(obfuscated.email)
-    }
-    if (obfuscated.phone) {
-      obfuscated.phone = obfuscateData(obfuscated.phone)
-    }
-    if (obfuscated.name) {
-      obfuscated.name = obfuscateData(obfuscated.name)
-    }
-    return obfuscated
-  }
-  
-  return data
-}
 
-/**
- * Deobfuscate data (for display purposes)
- */
-function deobfuscateData(data: any): any {
-  // In a real implementation, you'd store the original data
-  // For now, we'll just return the obfuscated data
-  return data
-}
+import { AppState, Order, ShipmentResult } from '@/types'
 
-/**
- * Storage wrapper with obfuscation
- */
 export class StorageManager {
-  /**
-   * Get data from Chrome storage
-   */
-  static async get<T = any>(key: string): Promise<T | null> {
-    try {
-      const result = await chrome.storage.local.get([key])
-      return result[key] || null
-    } catch (error) {
-      console.error('Failed to get data from storage:', error)
-      return null
-    }
+  private static readonly KEYS = {
+    AUTH_TOKEN: 'auth_token',
+    USER_DATA: 'user_data',
+    ORDERS: 'orders',
+    SHIPMENTS: 'shipments',
+    SETTINGS: 'settings'
+  } as const
+
+  // Authentication
+  static async getAuthToken(): Promise<string | null> {
+    const result = await chrome.storage.local.get([this.KEYS.AUTH_TOKEN])
+    return result[this.KEYS.AUTH_TOKEN] || null
   }
 
-  /**
-   * Set data in Chrome storage
-   */
-  static async set(key: string, value: any): Promise<void> {
-    try {
-      await chrome.storage.local.set({ [key]: value })
-    } catch (error) {
-      console.error('Failed to set data in storage:', error)
-      throw error
-    }
+  static async setAuthToken(token: string): Promise<void> {
+    await chrome.storage.local.set({ [this.KEYS.AUTH_TOKEN]: token })
   }
 
-  /**
-   * Remove data from Chrome storage
-   */
-  static async remove(key: string): Promise<void> {
-    try {
-      await chrome.storage.local.remove([key])
-    } catch (error) {
-      console.error('Failed to remove data from storage:', error)
-      throw error
-    }
+  static async clearAuthToken(): Promise<void> {
+    await chrome.storage.local.remove([this.KEYS.AUTH_TOKEN])
   }
 
-  /**
-   * Clear all storage
-   */
-  static async clear(): Promise<void> {
-    try {
-      await chrome.storage.local.clear()
-    } catch (error) {
-      console.error('Failed to clear storage:', error)
-      throw error
-    }
+  // User data
+  static async getUserData(): Promise<any | null> {
+    const result = await chrome.storage.local.get([this.KEYS.USER_DATA])
+    return result[this.KEYS.USER_DATA] || null
   }
 
-  /**
-   * Get orders queue
-   */
-  static async getOrdersQueue(): Promise<OrderStandard[]> {
-    const orders = await this.get<OrderStandard[]>(STORAGE_KEYS.ORDERS_QUEUE)
-    return orders || []
+  static async setUserData(userData: any): Promise<void> {
+    await chrome.storage.local.set({ [this.KEYS.USER_DATA]: userData })
   }
 
-  /**
-   * Set orders queue
-   */
-  static async setOrdersQueue(orders: OrderStandard[]): Promise<void> {
-    // Obfuscate sensitive data before storing
-    const obfuscatedOrders = orders.map(order => ({
-      ...order,
-      buyer: obfuscateData(order.buyer),
-      shipping: obfuscateData(order.shipping)
-    }))
+  static async clearUserData(): Promise<void> {
+    await chrome.storage.local.remove([this.KEYS.USER_DATA])
+  }
+
+  // Orders
+  static async getOrders(): Promise<Order[]> {
+    const result = await chrome.storage.local.get([this.KEYS.ORDERS])
+    return result[this.KEYS.ORDERS] || []
+  }
+
+  static async setOrders(orders: Order[]): Promise<void> {
+    await chrome.storage.local.set({ [this.KEYS.ORDERS]: orders })
+  }
+
+  static async addOrder(order: Order): Promise<void> {
+    const orders = await this.getOrders()
+    const existingIndex = orders.findIndex(o => o.order_id === order.order_id)
     
-    await this.set(STORAGE_KEYS.ORDERS_QUEUE, obfuscatedOrders)
+    if (existingIndex >= 0) {
+      orders[existingIndex] = order
+    } else {
+      orders.push(order)
+    }
+    
+    await this.setOrders(orders)
   }
 
-  /**
-   * Add orders to queue
-   */
-  static async addOrdersToQueue(newOrders: OrderStandard[]): Promise<void> {
-    const existingOrders = await this.getOrdersQueue()
-    const allOrders = [...existingOrders, ...newOrders]
-    await this.setOrdersQueue(allOrders)
+  static async removeOrder(orderId: string): Promise<void> {
+    const orders = await this.getOrders()
+    const filteredOrders = orders.filter(o => o.order_id !== orderId)
+    await this.setOrders(filteredOrders)
   }
 
-  /**
-   * Clear orders queue
-   */
-  static async clearOrdersQueue(): Promise<void> {
-    await this.remove(STORAGE_KEYS.ORDERS_QUEUE)
+  static async clearOrders(): Promise<void> {
+    await chrome.storage.local.remove([this.KEYS.ORDERS])
   }
 
-  /**
-   * Get extension settings
-   */
+  // Shipments
+  static async getShipments(): Promise<ShipmentResult[]> {
+    const result = await chrome.storage.local.get([this.KEYS.SHIPMENTS])
+    return result[this.KEYS.SHIPMENTS] || []
+  }
+
+  static async setShipments(shipments: ShipmentResult[]): Promise<void> {
+    await chrome.storage.local.set({ [this.KEYS.SHIPMENTS]: shipments })
+  }
+
+  static async addShipment(shipment: ShipmentResult): Promise<void> {
+    const shipments = await this.getShipments()
+    const existingIndex = shipments.findIndex(s => s.shipment_id === shipment.shipment_id)
+    
+    if (existingIndex >= 0) {
+      shipments[existingIndex] = shipment
+    } else {
+      shipments.push(shipment)
+    }
+    
+    await this.setShipments(shipments)
+  }
+
+  static async removeShipment(shipmentId: string): Promise<void> {
+    const shipments = await this.getShipments()
+    const filteredShipments = shipments.filter(s => s.shipment_id !== shipmentId)
+    await this.setShipments(filteredShipments)
+  }
+
+  static async clearShipments(): Promise<void> {
+    await chrome.storage.local.remove([this.KEYS.SHIPMENTS])
+  }
+
+  // Settings
   static async getSettings(): Promise<Record<string, any>> {
-    const settings = await this.get<Record<string, any>>(STORAGE_KEYS.SETTINGS)
-    return settings || {}
+    const result = await chrome.storage.local.get([this.KEYS.SETTINGS])
+    return result[this.KEYS.SETTINGS] || {}
   }
 
-  /**
-   * Set extension settings
-   */
   static async setSettings(settings: Record<string, any>): Promise<void> {
-    await this.set(STORAGE_KEYS.SETTINGS, settings)
+    await chrome.storage.local.set({ [this.KEYS.SETTINGS]: settings })
   }
 
-  /**
-   * Get last sync timestamp
-   */
-  static async getLastSync(): Promise<number | null> {
-    return await this.get<number>(STORAGE_KEYS.LAST_SYNC)
+  static async updateSetting(key: string, value: any): Promise<void> {
+    const settings = await this.getSettings()
+    settings[key] = value
+    await this.setSettings(settings)
   }
 
-  /**
-   * Set last sync timestamp
-   */
-  static async setLastSync(timestamp: number): Promise<void> {
-    await this.set(STORAGE_KEYS.LAST_SYNC, timestamp)
+  // App state
+  static async getAppState(): Promise<Partial<AppState>> {
+    const [authToken, userData, orders, shipments] = await Promise.all([
+      this.getAuthToken(),
+      this.getUserData(),
+      this.getOrders(),
+      this.getShipments()
+    ])
+
+    return {
+      isAuthenticated: !!authToken,
+      user: userData,
+      orders,
+      shipments
+    }
   }
 
-  /**
-   * Get storage usage info
-   */
+  static async clearAll(): Promise<void> {
+    await chrome.storage.local.clear()
+  }
+
+  // Storage info
   static async getStorageInfo(): Promise<chrome.storage.StorageArea> {
-    try {
-      return await chrome.storage.local.getBytesInUse()
-    } catch (error) {
-      console.error('Failed to get storage info:', error)
-      return 0
-    }
+    return await chrome.storage.local.getBytesInUse()
   }
 
-  /**
-   * Check if storage quota is exceeded
-   */
   static async isStorageQuotaExceeded(): Promise<boolean> {
-    try {
-      const quota = chrome.storage.local.QUOTA_BYTES || 5242880 // 5MB default
-      const used = await this.getStorageInfo()
-      return used > quota * 0.9 // 90% threshold
-    } catch (error) {
-      console.error('Failed to check storage quota:', error)
-      return false
-    }
-  }
-
-  /**
-   * Cleanup old data to free space
-   */
-  static async cleanupOldData(): Promise<void> {
-    try {
-      const orders = await this.getOrdersQueue()
-      const lastSync = await this.getLastSync()
-      const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
-      
-      // Remove orders older than 1 week
-      const recentOrders = orders.filter(order => {
-        const orderDate = new Date(order.createdAt).getTime()
-        return orderDate > oneWeekAgo
-      })
-      
-      if (recentOrders.length < orders.length) {
-        await this.setOrdersQueue(recentOrders)
-        console.log(`Cleaned up ${orders.length - recentOrders.length} old orders`)
-      }
-    } catch (error) {
-      console.error('Failed to cleanup old data:', error)
-    }
+    const quota = await chrome.storage.local.getBytesInUse()
+    return quota > (chrome.storage.local.QUOTA_BYTES * 0.9)
   }
 }

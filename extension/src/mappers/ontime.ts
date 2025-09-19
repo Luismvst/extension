@@ -90,7 +90,7 @@ export class OnTimeAPI {
   /**
    * Placeholder for creating shipment
    */
-  async createShipment(order: OrderStandard): Promise<{ shipmentId: string; trackingNumber: string }> {
+  async createShipment(_order: OrderStandard): Promise<{ shipmentId: string; trackingNumber: string }> {
     // This will be implemented in Phase 2
     throw new Error('OnTime API integration not yet implemented')
   }
@@ -98,7 +98,7 @@ export class OnTimeAPI {
   /**
    * Placeholder for tracking shipment
    */
-  async trackShipment(trackingNumber: string): Promise<{ status: string; location: string; timestamp: string }> {
+  async trackShipment(_trackingNumber: string): Promise<{ status: string; location: string; timestamp: string }> {
     // This will be implemented in Phase 2
     throw new Error('OnTime API integration not yet implemented')
   }
@@ -106,7 +106,7 @@ export class OnTimeAPI {
   /**
    * Placeholder for generating label
    */
-  async generateLabel(shipmentId: string): Promise<{ labelUrl: string; labelData: string }> {
+  async generateLabel(_shipmentId: string): Promise<{ labelUrl: string; labelData: string }> {
     // This will be implemented in Phase 2
     throw new Error('OnTime API integration not yet implemented')
   }

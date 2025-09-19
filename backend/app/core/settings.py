@@ -1,67 +1,58 @@
 """
-Application settings using Pydantic Settings
+Application settings and configuration.
+
+This module contains all configuration settings for the application,
+including environment variables, API endpoints, and feature flags.
 """
-from typing import List, Literal
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+import os
+from typing import Optional
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings"""
-    
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
-    )
+    """Application settings."""
     
     # Application
-    app_name: str = "Mirakl CSV Backend"
-    version: str = "0.1.0"
-    environment: Literal["development", "staging", "production"] = "development"
+    app_name: str = "Mirakl-TIPSA Orchestrator"
+    app_version: str = "0.2.0"
     debug: bool = False
     
     # Server
     host: str = "0.0.0.0"
-    port: int = Field(default=8080, ge=1, le=65535)
-    
-    # Logging
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    log_format: str = "json"
-    
-    # CORS
-    allowed_origins: List[str] = Field(
-        default=[
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "chrome-extension://*"
-        ]
-    )
-    
-    # External APIs (for future use)
-    tipsa_api_url: str = ""
-    tipsa_api_token: str = ""
-    ontime_api_url: str = ""
-    ontime_api_token: str = ""
-    
-    # Mirakl API (for future use)
-    mirakl_api_url: str = ""
-    mirakl_api_token: str = ""
+    port: int = 8080
     
     # Security
     secret_key: str = "your-secret-key-change-in-production"
-    access_token_expire_minutes: int = 30
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 30
     
-    # Rate limiting
-    rate_limit_requests: int = 100
-    rate_limit_window: int = 60  # seconds
+    # Mirakl API
+    mirakl_api_key: Optional[str] = None
+    mirakl_shop_id: Optional[str] = None
+    mirakl_base_url: str = "https://marketplace.mirakl.net"
+    mirakl_mock_mode: bool = True
     
-    # Data retention
-    cleanup_days: int = 7
-    max_orders_per_request: int = 1000
+    # TIPSA API
+    tipsa_api_key: Optional[str] = None
+    tipsa_base_url: str = "https://api.tipsa.com"
+    tipsa_mock_mode: bool = True
+    
+    # Logging
+    log_level: str = "INFO"
+    log_file: str = "/app/logs/orchestrator.log"
+    csv_log_file: str = "/app/logs/operations.csv"
+    json_dumps_dir: str = "/app/logs/dumps"
+    
+    # Business Rules
+    default_carrier: str = "tipsa"
+    max_weight_kg: float = 30.0
+    min_weight_kg: float = 0.1
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
 
 
-def get_settings() -> Settings:
-    """Get application settings"""
-    return Settings()
+# Global settings instance
+settings = Settings()

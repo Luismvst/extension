@@ -1,5 +1,5 @@
 import { CSVMapping, MARKETPLACES, ValidationError, NetworkError } from '@/common/types'
-import { parseCSV, detectMarketplace } from '@/lib/csv'
+import { parseCSV } from '@/lib/csv'
 import { sendMessage } from '@/common/messages'
 
 /**
@@ -277,7 +277,7 @@ export class CSVExportHook {
   /**
    * Show loading indicator
    */
-  private showLoadingIndicator(element: Element): void {
+  private showLoadingIndicator(_element: Element): void {
     const indicator = document.createElement('div')
     indicator.className = 'mirakl-loading-indicator'
     indicator.innerHTML = '⏳ Processing CSV...'
@@ -299,7 +299,7 @@ export class CSVExportHook {
   /**
    * Hide loading indicator
    */
-  private hideLoadingIndicator(element: Element): void {
+  private hideLoadingIndicator(_element: Element): void {
     const indicator = document.querySelector('.mirakl-loading-indicator')
     if (indicator) {
       indicator.remove()
@@ -368,7 +368,9 @@ export class CSVExportHook {
     element.removeAttribute('data-mirakl-hooked')
     
     // Trigger original click
-    element.click()
+    if (element instanceof HTMLElement) {
+      element.click()
+    }
     
     // Re-attach hook
     setTimeout(() => {
