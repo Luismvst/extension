@@ -75,14 +75,14 @@ async def create_tipsa_shipment(
 
 @router.post("/tipsa/shipments/bulk")
 async def create_tipsa_shipments_bulk(
-    orders_data: List[Dict[str, Any]],
+    request_data: Dict[str, Any],
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
     Create multiple TIPSA shipments in bulk.
     
     Args:
-        orders_data: List of order information
+        request_data: Request data containing shipments list
         current_user: Authenticated user (from JWT)
     
     Returns:
@@ -91,6 +91,9 @@ async def create_tipsa_shipments_bulk(
     start_time = time.time()
     
     try:
+        # Extract shipments from request data
+        orders_data = request_data.get("shipments", [])
+        
         # Create shipments in TIPSA
         result = await tipsa_adapter.create_shipments_bulk(orders_data)
         
@@ -108,7 +111,7 @@ async def create_tipsa_shipments_bulk(
         json_dumper.dump_request_response(
             operation="create_tipsa_shipments_bulk",
             order_id="",
-            request_data={"orders": orders_data},
+            request_data=request_data,
             response_data=result
         )
         

@@ -52,12 +52,12 @@ class MiraklAdapter(MarketplaceAdapter):
     
     async def _get_orders_mock(self, status: str, limit: int, offset: int) -> Dict[str, Any]:
         """Mock implementation of get_orders."""
-        # Mock orders data
+        # Mock orders data with different statuses
         mock_orders = [
             {
                 "order_id": "MIR-001",
                 "marketplace": "mirakl",
-                "status": "SHIPPING",
+                "status": "PENDING",
                 "customer_name": "Juan Pérez",
                 "customer_email": "juan.perez@email.com",
                 "weight": 2.5,
@@ -75,7 +75,7 @@ class MiraklAdapter(MarketplaceAdapter):
             {
                 "order_id": "MIR-002",
                 "marketplace": "mirakl",
-                "status": "SHIPPING",
+                "status": "PENDING_APPROVAL",
                 "customer_name": "María García",
                 "customer_email": "maria.garcia@email.com",
                 "weight": 1.8,
@@ -89,11 +89,50 @@ class MiraklAdapter(MarketplaceAdapter):
                     "postal_code": "08001",
                     "country": "ES"
                 }
+            },
+            {
+                "order_id": "MIR-003",
+                "marketplace": "mirakl",
+                "status": "SHIPPING",
+                "customer_name": "Carlos López",
+                "customer_email": "carlos.lopez@email.com",
+                "weight": 3.2,
+                "total_amount": 67.80,
+                "currency": "EUR",
+                "created_at": "2025-09-19T18:00:00Z",
+                "shipping_address": {
+                    "name": "Carlos López",
+                    "street": "Plaza España 789",
+                    "city": "Valencia",
+                    "postal_code": "46001",
+                    "country": "ES"
+                }
+            },
+            {
+                "order_id": "MIR-004",
+                "marketplace": "mirakl",
+                "status": "SHIPPED",
+                "customer_name": "Ana Martín",
+                "customer_email": "ana.martin@email.com",
+                "weight": 1.5,
+                "total_amount": 28.90,
+                "currency": "EUR",
+                "created_at": "2025-09-19T16:00:00Z",
+                "shipping_address": {
+                    "name": "Ana Martín",
+                    "street": "Calle del Sol 321",
+                    "city": "Sevilla",
+                    "postal_code": "41001",
+                    "country": "ES"
+                }
             }
         ]
         
-        # Filter by status
-        filtered_orders = [order for order in mock_orders if order["status"] == status]
+        # Filter by status - only show PENDING and PENDING_APPROVAL orders
+        if status in ["PENDING", "PENDING_APPROVAL"]:
+            filtered_orders = [order for order in mock_orders if order["status"] in ["PENDING", "PENDING_APPROVAL"]]
+        else:
+            filtered_orders = [order for order in mock_orders if order["status"] == status]
         
         # Apply pagination
         paginated_orders = filtered_orders[offset:offset + limit]

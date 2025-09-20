@@ -3,6 +3,7 @@
  */
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import Logger from './logger'
 import { 
   LoginRequest, 
   LoginResponse, 
@@ -30,20 +31,17 @@ class ApiClient {
 
     // Add request interceptor to include auth token
     this.client.interceptors.request.use((config) => {
-      const token = this.getAuthToken()
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
+      // We'll handle token injection in each method call
       return config
     })
 
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
         if (error.response?.status === 401) {
           // Token expired or invalid
-          this.clearAuthToken()
+          await this.clearAuthToken()
           window.location.reload()
         }
         return Promise.reject(error)
@@ -51,16 +49,49 @@ class ApiClient {
     )
   }
 
-  private getAuthToken(): string | null {
-    return localStorage.getItem('auth_token')
+  private async getAuthToken(): Promise<string | null> {
+    const result = await chrome.storage.local.get(['auth_token'])
+    return result.auth_token || null
   }
 
-  private setAuthToken(token: string): void {
-    localStorage.setItem('auth_token', token)
+  private async setAuthToken(token: string): Promise<void> {
+    await chrome.storage.local.set({
+      auth_token: token,
+      auth_token_timestamp: Date.now().toString()
+    })
   }
 
-  private clearAuthToken(): void {
-    localStorage.removeItem('auth_token')
+  private async clearAuthToken(): Promise<void> {
+    await chrome.storage.local.remove(['auth_token', 'auth_token_timestamp'])
+  }
+
+  private async isTokenExpired(): Promise<boolean> {
+    const result = await chrome.storage.local.get(['auth_token_timestamp'])
+    const timestamp = result.auth_token_timestamp
+    if (!timestamp) return true
+    
+    const tokenAge = Date.now() - parseInt(timestamp)
+    const fifteenMinutes = 15 * 60 * 1000 // 15 minutes in milliseconds
+    
+    return tokenAge > fifteenMinutes
+  }
+
+  private async ensureValidToken(): Promise<void> {
+    const token = await this.getAuthToken()
+    const expired = await this.isTokenExpired()
+    if (!token || expired) {
+      console.log('Token expired or missing, refreshing...')
+      await this.getExtensionToken()
+    }
+  }
+
+  private async addAuthHeader(config: any): Promise<any> {
+    await this.ensureValidToken()
+    const token = await this.getAuthToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
   }
 
   // Authentication
@@ -70,18 +101,20 @@ class ApiClient {
       credentials
     )
     
-    this.setAuthToken(response.data.access_token)
+    await this.setAuthToken(response.data.access_token)
     return response.data
   }
 
   async getCurrentUser(): Promise<any> {
-    const response = await this.client.get('/auth/me')
+    const config = await this.addAuthHeader({ headers: {} })
+    const response = await this.client.get('/auth/me', config)
     return response.data
   }
 
   async validateToken(): Promise<boolean> {
     try {
-      await this.client.post('/auth/validate')
+      const config = await this.addAuthHeader({ headers: {} })
+      await this.client.post('/auth/validate', {}, config)
       return true
     } catch {
       return false
@@ -93,7 +126,7 @@ class ApiClient {
       '/auth/extension-token'
     )
     
-    this.setAuthToken(response.data.access_token)
+    await this.setAuthToken(response.data.access_token)
     return response.data
   }
 
@@ -105,11 +138,29 @@ class ApiClient {
     limit?: number
     offset?: number
   } = {}): Promise<OrdersResponse> {
-    const response: AxiosResponse<OrdersResponse> = await this.client.get(
-      '/api/v1/marketplaces/mirakl/orders',
-      { params }
-    )
-    return response.data
+    Logger.section('🛒 MIRAKL ORDERS REQUEST')
+    Logger.apiRequest('GET', '/api/v1/marketplaces/mirakl/orders', params)
+    
+    try {
+      const config = await this.addAuthHeader({ headers: {} })
+      const response: AxiosResponse<OrdersResponse> = await this.client.get(
+        '/api/v1/marketplaces/mirakl/orders',
+        { ...config, params }
+      )
+      
+      Logger.apiResponse(response.status, response.data)
+      Logger.success(`Retrieved ${response.data.orders?.length || 0} orders from Mirakl`)
+      
+      return response.data
+    } catch (error: any) {
+      Logger.error('Failed to get Mirakl orders', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        params
+      })
+      throw error
+    }
   }
 
   async getMiraklOrder(orderId: string): Promise<any> {
@@ -121,20 +172,59 @@ class ApiClient {
     orderId: string, 
     trackingData: TrackingUploadRequest
   ): Promise<TrackingUploadResponse> {
-    const response: AxiosResponse<TrackingUploadResponse> = await this.client.put(
-      `/api/v1/marketplaces/mirakl/orders/${orderId}/tracking`,
-      trackingData
-    )
-    return response.data
+    Logger.section('📤 UPLOAD TRACKING TO MIRAKL')
+    Logger.apiRequest('PUT', `/api/v1/marketplaces/mirakl/orders/${orderId}/tracking`, trackingData)
+    
+    try {
+      const config = await this.addAuthHeader({ headers: {} })
+      const response: AxiosResponse<TrackingUploadResponse> = await this.client.put(
+        `/api/v1/marketplaces/mirakl/orders/${orderId}/tracking`,
+        trackingData,
+        config
+      )
+      
+      Logger.apiResponse(response.status, response.data)
+      Logger.success(`Uploaded tracking for order ${orderId} to Mirakl`)
+      
+      return response.data
+    } catch (error: any) {
+      Logger.error('Failed to upload tracking to Mirakl', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        orderId,
+        trackingData
+      })
+      throw error
+    }
   }
 
   // Carrier operations
   async createShipments(shipments: CreateShipmentsRequest): Promise<CreateShipmentsResponse> {
-    const response: AxiosResponse<CreateShipmentsResponse> = await this.client.post(
-      '/api/v1/carriers/tipsa/shipments/bulk',
-      shipments
-    )
-    return response.data
+    Logger.section('🚚 TIPSA SHIPMENTS CREATION')
+    Logger.apiRequest('POST', '/api/v1/carriers/tipsa/shipments/bulk', shipments)
+    
+    try {
+      const config = await this.addAuthHeader({ headers: {} })
+      const response: AxiosResponse<CreateShipmentsResponse> = await this.client.post(
+        '/api/v1/carriers/tipsa/shipments/bulk',
+        shipments,
+        config
+      )
+      
+      Logger.apiResponse(response.status, response.data)
+      Logger.success(`Created ${response.data.shipments?.length || 0} shipments in TIPSA`)
+      
+      return response.data
+    } catch (error: any) {
+      Logger.error('Failed to create TIPSA shipments', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        shipments
+      })
+      throw error
+    }
   }
 
   async getShipment(shipmentId: string): Promise<any> {
@@ -143,8 +233,29 @@ class ApiClient {
   }
 
   async trackShipment(trackingNumber: string): Promise<any> {
-    const response = await this.client.get(`/api/v1/carriers/tipsa/tracking/${trackingNumber}`)
-    return response.data
+    Logger.section('🔍 TIPSA SHIPMENT TRACKING')
+    Logger.apiRequest('GET', `/api/v1/carriers/tipsa/tracking/${trackingNumber}`)
+    
+    try {
+      const config = await this.addAuthHeader({ headers: {} })
+      const response = await this.client.get(
+        `/api/v1/carriers/tipsa/tracking/${trackingNumber}`,
+        config
+      )
+      
+      Logger.apiResponse(response.status, response.data)
+      Logger.success(`Retrieved tracking info for ${trackingNumber}`)
+      
+      return response.data
+    } catch (error: any) {
+      Logger.error('Failed to track shipment', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        trackingNumber
+      })
+      throw error
+    }
   }
 
   async getShipmentLabel(shipmentId: string): Promise<Blob> {

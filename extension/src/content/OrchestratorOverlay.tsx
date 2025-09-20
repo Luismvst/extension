@@ -44,6 +44,7 @@ import {
 import { apiClient } from '@/lib/api'
 import { StorageManager } from '@/lib/storage'
 import { Order, ShipmentResult, AppState } from '@/types'
+import Logger from '@/lib/logger'
 
 const OrchestratorOverlay: React.FC = () => {
   const [appState, setAppState] = useState<AppState>({
@@ -67,14 +68,18 @@ const OrchestratorOverlay: React.FC = () => {
       setAppState(prev => ({ ...prev, ...state }))
       
       // Auto-authenticate with extension token if not already authenticated
-      if (!apiClient.isAuthenticated()) {
+      const isAuth = await apiClient.isAuthenticated()
+      if (!isAuth) {
         try {
           await apiClient.getExtensionToken()
           setAppState(prev => ({ ...prev, isAuthenticated: true }))
           console.log('Auto-authenticated with extension token')
         } catch (err) {
           console.error('Failed to auto-authenticate:', err)
+          setAppState(prev => ({ ...prev, isAuthenticated: false }))
         }
+      } else {
+        setAppState(prev => ({ ...prev, isAuthenticated: true }))
       }
     } catch (err) {
       console.error('Failed to load initial state:', err)
@@ -82,23 +87,32 @@ const OrchestratorOverlay: React.FC = () => {
   }
 
   const handleLoadOrders = async () => {
+    Logger.section('🔄 LOADING MIRAKL ORDERS')
+    Logger.step(1, 3, 'Starting order loading process')
+    
     setAppState(prev => ({ ...prev, isLoading: true, error: undefined }))
     setError(null)
 
     try {
       // Check authentication
-      if (!apiClient.isAuthenticated()) {
+      Logger.info('Checking authentication status')
+      const isAuth = await apiClient.isAuthenticated()
+      if (!isAuth) {
+        Logger.warning('User not authenticated, requesting login')
         setError('Please log in first using the extension popup')
         return
       }
+      Logger.success('User is authenticated')
 
-      // Fetch orders from Mirakl
+      // Fetch orders from Mirakl - only PENDING and PENDING_APPROVAL orders
+      Logger.step(2, 3, 'Fetching orders from Mirakl API')
       const response = await apiClient.getMiraklOrders({
-        status: 'SHIPPING',
+        status: 'PENDING',
         limit: 50
       })
 
       // Store orders
+      Logger.step(3, 3, 'Storing orders in local storage')
       await StorageManager.setOrders(response.orders)
       setAppState(prev => ({ 
         ...prev, 
@@ -106,16 +120,25 @@ const OrchestratorOverlay: React.FC = () => {
         isLoading: false 
       }))
 
+      Logger.success(`Successfully loaded ${response.orders.length} orders`)
       setShowOrders(true)
     } catch (err: any) {
-      console.error('Failed to load orders:', err)
+      Logger.error('Failed to load orders', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      })
       setError(err.message || 'Failed to load orders')
       setAppState(prev => ({ ...prev, isLoading: false }))
     }
   }
 
   const handleCreateShipments = async () => {
+    Logger.section('🚚 CREATING TIPSA SHIPMENTS')
+    Logger.step(1, 4, 'Starting shipment creation process')
+    
     if (appState.orders.length === 0) {
+      Logger.warning('No orders available to create shipments')
       setError('No orders available to create shipments')
       return
     }
@@ -124,6 +147,8 @@ const OrchestratorOverlay: React.FC = () => {
     setError(null)
 
     try {
+      Logger.info(`Converting ${appState.orders.length} orders to shipment requests`)
+      
       // Convert orders to shipment requests
       const shipmentRequests = appState.orders.map(order => ({
         order_id: order.order_id,
@@ -134,11 +159,15 @@ const OrchestratorOverlay: React.FC = () => {
         notes: order.notes
       }))
 
+      Logger.step(2, 4, 'Prepared shipment requests', shipmentRequests)
+
       // Create shipments
+      Logger.step(3, 4, 'Sending shipment requests to TIPSA API')
       const response = await apiClient.createShipments({
         shipments: shipmentRequests
       })
 
+      Logger.step(4, 4, 'Storing shipments in local storage')
       // Store shipments
       await StorageManager.setShipments(response.shipments)
       setAppState(prev => ({ 
@@ -147,16 +176,26 @@ const OrchestratorOverlay: React.FC = () => {
         isLoading: false 
       }))
 
+      Logger.success(`Successfully created ${response.shipments.length} shipments`)
       setShowShipments(true)
     } catch (err: any) {
-      console.error('Failed to create shipments:', err)
+      Logger.error('Failed to create shipments', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        orders: appState.orders
+      })
       setError(err.message || 'Failed to create shipments')
       setAppState(prev => ({ ...prev, isLoading: false }))
     }
   }
 
   const handleUploadTracking = async () => {
+    Logger.section('📤 UPLOADING TRACKING TO MIRAKL')
+    Logger.step(1, 3, 'Starting tracking upload process')
+    
     if (appState.shipments.length === 0) {
+      Logger.warning('No shipments available to upload tracking')
       setError('No shipments available to upload tracking')
       return
     }
@@ -168,9 +207,12 @@ const OrchestratorOverlay: React.FC = () => {
       let successCount = 0
       let errorCount = 0
 
+      Logger.info(`Uploading tracking for ${appState.shipments.length} shipments`)
+
       // Upload tracking for each shipment
       for (const shipment of appState.shipments) {
         try {
+          Logger.step(2, 3, `Uploading tracking for order ${shipment.order_id}`)
           await apiClient.uploadTrackingToMirakl(shipment.order_id, {
             tracking_number: shipment.tracking_number,
             carrier_code: 'tipsa',
@@ -178,16 +220,35 @@ const OrchestratorOverlay: React.FC = () => {
             carrier_url: shipment.label_url
           })
           successCount++
-        } catch (err) {
-          console.error(`Failed to upload tracking for order ${shipment.order_id}:`, err)
+          Logger.success(`Successfully uploaded tracking for order ${shipment.order_id}`)
+        } catch (err: any) {
+          Logger.error(`Failed to upload tracking for order ${shipment.order_id}`, {
+            message: err.message,
+            response: err.response?.data,
+            status: err.response?.status,
+            shipment
+          })
           errorCount++
         }
       }
 
+      Logger.step(3, 3, 'Tracking upload process completed')
       setAppState(prev => ({ ...prev, isLoading: false }))
       setError(`Tracking upload completed: ${successCount} successful, ${errorCount} failed`)
+      
+      if (successCount > 0) {
+        Logger.success(`Successfully uploaded tracking for ${successCount} shipments`)
+      }
+      if (errorCount > 0) {
+        Logger.warning(`Failed to upload tracking for ${errorCount} shipments`)
+      }
     } catch (err: any) {
-      console.error('Failed to upload tracking:', err)
+      Logger.error('Failed to upload tracking', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        shipments: appState.shipments
+      })
       setError(err.message || 'Failed to upload tracking')
       setAppState(prev => ({ ...prev, isLoading: false }))
     }

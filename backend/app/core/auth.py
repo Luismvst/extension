@@ -8,7 +8,7 @@ and API endpoints.
 import jwt
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .settings import settings
@@ -62,7 +62,7 @@ class AuthManager:
 auth_manager = AuthManager()
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = security) -> Dict[str, Any]:
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """Dependency to get current user."""
     return auth_manager.get_current_user(credentials)
 

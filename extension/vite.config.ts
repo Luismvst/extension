@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  base: './',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -11,6 +12,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    minify: false, // Disable minification for better Chrome extension compatibility
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'src/popup/index.html'),
@@ -31,7 +33,9 @@ export default defineConfig({
             return 'content/styles.css'
           }
           return '[name].js'
-        }
+        },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
   },
