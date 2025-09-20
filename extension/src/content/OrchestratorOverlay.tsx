@@ -134,40 +134,18 @@ const OrchestratorOverlay: React.FC = () => {
   }
 
   const handleCreateShipments = async () => {
-    Logger.section('🚚 CREATING TIPSA SHIPMENTS')
-    Logger.step(1, 4, 'Starting shipment creation process')
+    Logger.section('🚚 CREATING SHIPMENTS WITH MULTIPLE CARRIERS')
+    Logger.step(1, 3, 'Starting multi-carrier shipment creation process')
     
-    if (appState.orders.length === 0) {
-      Logger.warning('No orders available to create shipments')
-      setError('No orders available to create shipments')
-      return
-    }
-
     setAppState(prev => ({ ...prev, isLoading: true, error: undefined }))
     setError(null)
 
     try {
-      Logger.info(`Converting ${appState.orders.length} orders to shipment requests`)
-      
-      // Convert orders to shipment requests
-      const shipmentRequests = appState.orders.map(order => ({
-        order_id: order.order_id,
-        service_type: order.service_type || 'standard',
-        weight: order.weight,
-        cod_amount: order.cod_amount,
-        reference: order.order_id,
-        notes: order.notes
-      }))
+      Logger.step(2, 3, 'Calling orchestrator to load orders and create shipments')
+      // Use the new orchestrator endpoint that handles everything
+      const response = await apiClient.loadOrdersAndCreateShipments()
 
-      Logger.step(2, 4, 'Prepared shipment requests', shipmentRequests)
-
-      // Create shipments
-      Logger.step(3, 4, 'Sending shipment requests to TIPSA API')
-      const response = await apiClient.createShipments({
-        shipments: shipmentRequests
-      })
-
-      Logger.step(4, 4, 'Storing shipments in local storage')
+      Logger.step(3, 3, 'Storing shipments in local storage')
       // Store shipments
       await StorageManager.setShipments(response.shipments)
       setAppState(prev => ({ 
@@ -176,14 +154,23 @@ const OrchestratorOverlay: React.FC = () => {
         isLoading: false 
       }))
 
-      Logger.success(`Successfully created ${response.shipments.length} shipments`)
+      // Log carrier breakdown
+      if (response.carrier_breakdown) {
+        Logger.info('Carrier breakdown:', response.carrier_breakdown)
+        Object.entries(response.carrier_breakdown).forEach(([carrier, info]: [string, any]) => {
+          if (info.shipments > 0) {
+            Logger.success(`${info.carrier_name}: ${info.shipments} shipments created`)
+          }
+        })
+      }
+
+      Logger.success(`Successfully created ${response.shipments_created} shipments across multiple carriers`)
       setShowShipments(true)
     } catch (err: any) {
       Logger.error('Failed to create shipments', {
         message: err.message,
         response: err.response?.data,
-        status: err.response?.status,
-        orders: appState.orders
+        status: err.response?.status
       })
       setError(err.message || 'Failed to create shipments')
       setAppState(prev => ({ ...prev, isLoading: false }))
@@ -204,43 +191,41 @@ const OrchestratorOverlay: React.FC = () => {
     setError(null)
 
     try {
-      let successCount = 0
-      let errorCount = 0
+      Logger.step(2, 3, 'Preparing tracking data for upload')
+      // Prepare tracking data for the new endpoint
+      const trackingData = appState.shipments.map(shipment => ({
+        order_id: shipment.order_id,
+        tracking_number: shipment.tracking_number,
+        carrier_code: shipment.carrier?.toLowerCase() || 'tipsa',
+        carrier_name: shipment.carrier || 'TIPSA'
+      }))
 
-      Logger.info(`Uploading tracking for ${appState.shipments.length} shipments`)
+      Logger.info(`Uploading tracking for ${trackingData.length} shipments`)
+      Logger.info('Tracking data:', trackingData)
 
-      // Upload tracking for each shipment
-      for (const shipment of appState.shipments) {
-        try {
-          Logger.step(2, 3, `Uploading tracking for order ${shipment.order_id}`)
-          await apiClient.uploadTrackingToMirakl(shipment.order_id, {
-            tracking_number: shipment.tracking_number,
-            carrier_code: 'tipsa',
-            carrier_name: 'TIPSA',
-            carrier_url: shipment.label_url
-          })
-          successCount++
-          Logger.success(`Successfully uploaded tracking for order ${shipment.order_id}`)
-        } catch (err: any) {
-          Logger.error(`Failed to upload tracking for order ${shipment.order_id}`, {
-            message: err.message,
-            response: err.response?.data,
-            status: err.response?.status,
-            shipment
-          })
-          errorCount++
-        }
-      }
+      // Upload tracking using the new orchestrator endpoint
+      const response = await apiClient.uploadTrackingToMirakl(trackingData)
 
       Logger.step(3, 3, 'Tracking upload process completed')
       setAppState(prev => ({ ...prev, isLoading: false }))
-      setError(`Tracking upload completed: ${successCount} successful, ${errorCount} failed`)
       
-      if (successCount > 0) {
-        Logger.success(`Successfully uploaded tracking for ${successCount} shipments`)
+      if (response.orders_updated > 0) {
+        Logger.success(`Successfully uploaded tracking for ${response.orders_updated} orders`)
+        setError(`Tracking upload completed: ${response.orders_updated} successful`)
+      } else {
+        Logger.warning('No orders were updated')
+        setError('No orders were updated')
       }
-      if (errorCount > 0) {
-        Logger.warning(`Failed to upload tracking for ${errorCount} shipments`)
+
+      // Log any errors from individual orders
+      if (response.tracking_updates) {
+        const errors = response.tracking_updates.filter((update: any) => update.status === 'ERROR')
+        if (errors.length > 0) {
+          Logger.warning(`${errors.length} orders failed to update`)
+          errors.forEach((error: any) => {
+            Logger.error(`Order ${error.order_id}: ${error.error}`)
+          })
+        }
       }
     } catch (err: any) {
       Logger.error('Failed to upload tracking', {
@@ -401,15 +386,23 @@ const OrchestratorOverlay: React.FC = () => {
                     <ListItem key={shipment.shipment_id}>
                       <ListItemText
                         primary={shipment.tracking_number}
-                        secondary={`${shipment.order_id} - ${shipment.status}`}
+                        secondary={`${shipment.order_id} - ${shipment.carrier || 'TIPSA'} - ${shipment.status}`}
                       />
                       <ListItemSecondaryAction>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDownloadLabel(shipment)}
-                        >
-                          <DownloadIcon />
-                        </IconButton>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Chip
+                            label={shipment.carrier || 'TIPSA'}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDownloadLabel(shipment)}
+                          >
+                            <DownloadIcon />
+                          </IconButton>
+                        </Box>
                       </ListItemSecondaryAction>
                     </ListItem>
                   ))}

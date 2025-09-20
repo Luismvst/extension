@@ -68,6 +68,7 @@ export interface ShipmentResult {
   status: string
   label_url?: string
   estimated_delivery?: string
+  carrier: string
   cost?: number
   currency: string
   metadata: Record<string, any>

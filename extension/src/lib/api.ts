@@ -12,7 +12,8 @@ import {
   CreateShipmentsResponse,
   TrackingUploadRequest,
   TrackingUploadResponse,
-  ApiResponse
+  ApiResponse,
+  ShipmentResult
 } from '@/types'
 
 class ApiClient {
@@ -30,15 +31,15 @@ class ApiClient {
     })
 
     // Add request interceptor to include auth token
-    this.client.interceptors.request.use((config) => {
+    this.client.interceptors.request.use((config: any) => {
       // We'll handle token injection in each method call
       return config
     })
 
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
-      (response) => response,
-      async (error) => {
+      (response: any) => response,
+      async (error: any) => {
         if (error.response?.status === 401) {
           // Token expired or invalid
           await this.clearAuthToken()
@@ -168,11 +169,11 @@ class ApiClient {
     return response.data
   }
 
-  async uploadTrackingToMirakl(
+  async uploadTrackingToMiraklSingle(
     orderId: string, 
     trackingData: TrackingUploadRequest
   ): Promise<TrackingUploadResponse> {
-    Logger.section('📤 UPLOAD TRACKING TO MIRAKL')
+    Logger.section('📤 UPLOAD TRACKING TO MIRAKL (SINGLE)')
     Logger.apiRequest('PUT', `/api/v1/marketplaces/mirakl/orders/${orderId}/tracking`, trackingData)
     
     try {
@@ -199,7 +200,85 @@ class ApiClient {
     }
   }
 
-  // Carrier operations
+  // Orchestrator operations
+  async loadOrdersAndCreateShipments(): Promise<{
+    success: boolean
+    message: string
+    orders_processed: number
+    shipments_created: number
+    shipments: ShipmentResult[]
+    carrier_breakdown: Record<string, any>
+  }> {
+    Logger.section('🔄 LOAD ORDERS AND CREATE SHIPMENTS')
+    Logger.apiRequest('POST', '/api/v1/orchestrator/load-orders', {})
+    
+    try {
+      const config = await this.addAuthHeader({ headers: {} })
+      const response: AxiosResponse<any> = await this.client.post(
+        '/api/v1/orchestrator/load-orders',
+        {},
+        config
+      )
+      
+      Logger.apiResponse(response.status, response.data)
+      Logger.success(`Processed ${response.data.orders_processed || 0} orders and created ${response.data.shipments_created || 0} shipments`)
+      
+      // Map shipments to ensure proper typing
+      const mappedShipments: ShipmentResult[] = (response.data.shipments || []).map((shipment: any) => ({
+        order_id: shipment.order_id,
+        shipment_id: shipment.shipment_id,
+        tracking_number: shipment.tracking_number,
+        status: shipment.status,
+        label_url: shipment.label_url,
+        estimated_delivery: shipment.estimated_delivery,
+        carrier: shipment.carrier || 'TIPSA',
+        cost: shipment.cost,
+        currency: shipment.currency || 'EUR',
+        metadata: shipment.metadata || {}
+      }))
+      
+      return {
+        ...response.data,
+        shipments: mappedShipments
+      }
+    } catch (error: any) {
+      Logger.error('Failed to load orders and create shipments', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      })
+      throw error
+    }
+  }
+
+  async uploadTrackingToMirakl(trackingData: any[]): Promise<any> {
+    Logger.section('📤 UPLOAD TRACKING TO MIRAKL')
+    Logger.apiRequest('POST', '/api/v1/orchestrator/upload-tracking', trackingData)
+    
+    try {
+      const config = await this.addAuthHeader({ headers: {} })
+      const response: AxiosResponse<any> = await this.client.post(
+        '/api/v1/orchestrator/upload-tracking',
+        trackingData,
+        config
+      )
+      
+      Logger.apiResponse(response.status, response.data)
+      Logger.success(`Uploaded tracking for ${response.data.orders_updated || 0} orders to Mirakl`)
+      
+      return response.data
+    } catch (error: any) {
+      Logger.error('Failed to upload tracking to Mirakl', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        trackingData
+      })
+      throw error
+    }
+  }
+
+  // Legacy carrier operations (kept for backward compatibility)
   async createShipments(shipments: CreateShipmentsRequest): Promise<CreateShipmentsResponse> {
     Logger.section('🚚 TIPSA SHIPMENTS CREATION')
     Logger.apiRequest('POST', '/api/v1/carriers/tipsa/shipments/bulk', shipments)

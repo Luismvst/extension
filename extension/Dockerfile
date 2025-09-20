@@ -11,26 +11,37 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the extension (updated for auto-auth)
+# Build the extension
 RUN npm run build
 
-# Copy built files to dist directory
-RUN cp -r dist/* /app/dist/ || true
+# Ensure dist directory exists and copy files
+RUN mkdir -p /app/dist && \
+    cp -r dist/* /app/dist/ || true
 
-# Copy CSS files manually
+# Copy HTML files to root directory (Vite generates them in subdirectories)
+RUN if [ -f /app/dist/src/popup/index.html ]; then \
+        cp /app/dist/src/popup/index.html /app/dist/popup.html; \
+    fi && \
+    if [ -f /app/dist/src/options/index.html ]; then \
+        cp /app/dist/src/options/index.html /app/dist/options.html; \
+    fi && \
+    echo "HTML files copied to root directory"
+
+# Copy CSS files to content directory (ensure it exists)
 RUN mkdir -p /app/dist/content && \
-    if [ -f /app/dist/assets/styles-*.css ]; then \
-        cp /app/dist/assets/styles-*.css /app/dist/content/styles.css; \
+    if [ -f /app/dist/content/styles.css ]; then \
+        echo "CSS already in place"; \
     else \
         cp src/content/styles.css /app/dist/content/styles.css; \
     fi
 
-# Copy HTML files to root directory
-RUN cp /app/dist/src/popup/index.html /app/dist/popup.html && \
-    cp /app/dist/src/options/index.html /app/dist/options.html
-
-# Expose port for development server (optional)
-EXPOSE 3000
+# Verify build output
+RUN echo "=== DIST ROOT ===" && \
+    ls -la /app/dist/ && \
+    echo "=== DIST CONTENT ===" && \
+    ls -la /app/dist/content/ && \
+    echo "=== DIST BACKGROUND ===" && \
+    ls -la /app/dist/background/ || true
 
 # Default command
 CMD ["npm", "run", "build"]

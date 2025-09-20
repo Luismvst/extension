@@ -275,3 +275,144 @@ async def cancel_tipsa_shipment(
             duration_ms=duration_ms
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# OnTime endpoints
+@router.post("/ontime/shipments")
+async def create_ontime_shipment(
+    shipment_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create a single OnTime shipment."""
+    from ..adapters.carriers.ontime import OnTimeAdapter
+    adapter = OnTimeAdapter()
+    return await adapter.create_shipment(shipment_data)
+
+
+@router.post("/ontime/shipments/bulk")
+async def create_ontime_shipments_bulk(
+    request_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create multiple OnTime shipments in bulk."""
+    from ..adapters.carriers.ontime import OnTimeAdapter
+    adapter = OnTimeAdapter()
+    orders_data = request_data.get("shipments", [])
+    return await adapter.create_shipments_bulk(orders_data)
+
+
+@router.get("/ontime/shipments/{shipment_id}")
+async def get_ontime_shipment_status(
+    shipment_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get OnTime shipment status."""
+    from ..adapters.carriers.ontime import OnTimeAdapter
+    adapter = OnTimeAdapter()
+    return await adapter.get_shipment_status(shipment_id)
+
+
+@router.get("/ontime/shipments/{shipment_id}/label")
+async def get_ontime_shipment_label(
+    shipment_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get OnTime shipment label."""
+    from ..adapters.carriers.ontime import OnTimeAdapter
+    adapter = OnTimeAdapter()
+    label_bytes = await adapter.get_shipment_label(shipment_id)
+    return {"content": label_bytes.decode('utf-8')}
+
+
+# DHL endpoints
+@router.post("/dhl/shipments")
+async def create_dhl_shipment(
+    shipment_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create a single DHL shipment."""
+    from ..adapters.carriers.dhl import DHLAdapter
+    adapter = DHLAdapter()
+    return await adapter.create_shipment(shipment_data)
+
+
+@router.post("/dhl/shipments/bulk")
+async def create_dhl_shipments_bulk(
+    request_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create multiple DHL shipments in bulk."""
+    from ..adapters.carriers.dhl import DHLAdapter
+    adapter = DHLAdapter()
+    orders_data = request_data.get("shipments", [])
+    return await adapter.create_shipments_bulk(orders_data)
+
+
+@router.get("/dhl/shipments/{shipment_id}")
+async def get_dhl_shipment_status(
+    shipment_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get DHL shipment status."""
+    from ..adapters.carriers.dhl import DHLAdapter
+    adapter = DHLAdapter()
+    return await adapter.get_shipment_status(shipment_id)
+
+
+@router.get("/dhl/shipments/{shipment_id}/label")
+async def get_dhl_shipment_label(
+    shipment_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get DHL shipment label."""
+    from ..adapters.carriers.dhl import DHLAdapter
+    adapter = DHLAdapter()
+    label_bytes = await adapter.get_shipment_label(shipment_id)
+    return {"content": label_bytes.decode('utf-8')}
+
+
+# UPS endpoints
+@router.post("/ups/shipments")
+async def create_ups_shipment(
+    shipment_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create a single UPS shipment."""
+    from ..adapters.carriers.ups import UPSAdapter
+    adapter = UPSAdapter()
+    return await adapter.create_shipment(shipment_data)
+
+
+@router.post("/ups/shipments/bulk")
+async def create_ups_shipments_bulk(
+    request_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create multiple UPS shipments in bulk."""
+    from ..adapters.carriers.ups import UPSAdapter
+    adapter = UPSAdapter()
+    orders_data = request_data.get("shipments", [])
+    return await adapter.create_shipments_bulk(orders_data)
+
+
+@router.get("/ups/shipments/{shipment_id}")
+async def get_ups_shipment_status(
+    shipment_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get UPS shipment status."""
+    from ..adapters.carriers.ups import UPSAdapter
+    adapter = UPSAdapter()
+    return await adapter.get_shipment_status(shipment_id)
+
+
+@router.get("/ups/shipments/{shipment_id}/label")
+async def get_ups_shipment_label(
+    shipment_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get UPS shipment label."""
+    from ..adapters.carriers.ups import UPSAdapter
+    adapter = UPSAdapter()
+    label_bytes = await adapter.get_shipment_label(shipment_id)
+    return {"content": label_bytes.decode('utf-8')}

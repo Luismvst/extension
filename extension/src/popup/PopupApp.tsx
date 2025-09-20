@@ -216,7 +216,7 @@ const PopupApp: React.FC = () => {
 
       for (const shipment of appState.shipments) {
         try {
-          await apiClient.uploadTrackingToMirakl(shipment.order_id, {
+          await apiClient.uploadTrackingToMiraklSingle(shipment.order_id, {
             tracking_number: shipment.tracking_number,
             carrier_code: 'tipsa',
             carrier_name: 'TIPSA',

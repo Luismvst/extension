@@ -1,22 +1,25 @@
-# Mirakl-TIPSA Orchestrator
+# Mirakl Multi-Carrier Orchestrator
 
-Un orquestador modular para gestionar pedidos entre marketplaces Mirakl y el transportista TIPSA, con una extensión de Chrome que proporciona una interfaz intuitiva tipo Sendcloud.
+Un orquestador modular para gestionar pedidos entre marketplaces Mirakl y múltiples transportistas (TIPSA, OnTime, DHL, UPS), con una extensión de Chrome que proporciona una interfaz intuitiva tipo Sendcloud.
 
 ## 🚀 Características Principales
 
 - **Extensión Chrome MV3** con Material Design
 - **Backend FastAPI** modular y extensible
+- **Soporte multi-transportista** (TIPSA, OnTime, DHL, UPS)
+- **Motor de reglas inteligente** para selección automática de transportista
 - **Adapters configurables** para marketplaces y transportistas
-- **Motor de reglas de negocio** para selección automática de transportista
 - **Logging CSV** completo con dumps de operaciones
 - **Modo Mock** para testing sin APIs reales
 - **Docker** para fácil despliegue
+- **Trazabilidad completa** de extremo a extremo
 
 ## 📋 Flujo de Trabajo
 
-1. **Cargar pedidos de Mirakl** - La extensión obtiene pedidos desde Mirakl
-2. **Crear envíos TIPSA** - Genera envíos automáticamente con TIPSA
-3. **Subir tracking a Mirakl** - Actualiza el estado de seguimiento en Mirakl
+1. **Cargar pedidos de Mirakl** - La extensión obtiene pedidos pendientes desde Mirakl
+2. **Selección automática de transportista** - El motor de reglas elige el mejor transportista
+3. **Crear envíos multi-transportista** - Genera envíos automáticamente con el transportista apropiado
+4. **Subir tracking a Mirakl** - Actualiza el estado de seguimiento en Mirakl con datos reales
 
 ## 🏗️ Arquitectura
 
@@ -117,6 +120,26 @@ MIRAKL_MODE=mock  # o 'live'
 TIPSA_BASE_URL=https://api.tip-sa.com
 TIPSA_API_KEY=your-api-key
 TIPSA_MODE=mock  # o 'live'
+
+# OnTime
+ONTIME_BASE_URL=https://api.ontime.com
+ONTIME_API_KEY=your-api-key
+ONTIME_MODE=mock  # o 'live'
+
+# DHL
+DHL_BASE_URL=https://api-eu.dhl.com
+DHL_API_KEY=your-api-key
+DHL_API_SECRET=your-api-secret
+DHL_ACCOUNT=your-account
+DHL_MODE=mock  # o 'live'
+
+# UPS
+UPS_BASE_URL=https://onlinetools.ups.com
+UPS_ACCESS_KEY=your-access-key
+UPS_USERNAME=your-username
+UPS_PASSWORD=your-password
+UPS_ACCOUNT_NUMBER=your-account
+UPS_MODE=mock  # o 'live'
 ```
 
 ### Extensión
@@ -139,10 +162,19 @@ Configuración disponible en la página de opciones:
 - `PUT /api/v1/marketplaces/mirakl/orders/{id}/tracking` - Subir tracking
 
 ### Transportistas
-- `POST /api/v1/carriers/tipsa/shipments` - Crear envío
-- `POST /api/v1/carriers/tipsa/shipments/bulk` - Crear múltiples envíos
-- `GET /api/v1/carriers/tipsa/shipments/{id}` - Obtener envío
-- `GET /api/v1/carriers/tipsa/tracking/{tracking}` - Seguimiento
+- `POST /api/v1/carriers/tipsa/shipments` - Crear envío TIPSA
+- `POST /api/v1/carriers/tipsa/shipments/bulk` - Crear múltiples envíos TIPSA
+- `POST /api/v1/carriers/ontime/shipments` - Crear envío OnTime
+- `POST /api/v1/carriers/ontime/shipments/bulk` - Crear múltiples envíos OnTime
+- `POST /api/v1/carriers/dhl/shipments` - Crear envío DHL
+- `POST /api/v1/carriers/dhl/shipments/bulk` - Crear múltiples envíos DHL
+- `POST /api/v1/carriers/ups/shipments` - Crear envío UPS
+- `POST /api/v1/carriers/ups/shipments/bulk` - Crear múltiples envíos UPS
+
+### Orquestador
+- `POST /api/v1/orchestrator/load-orders` - Cargar pedidos y crear envíos automáticamente
+- `POST /api/v1/orchestrator/upload-tracking` - Subir tracking a Mirakl
+- `GET /api/v1/orchestrator/status` - Estado del orquestador y transportistas
 
 ### Salud
 - `GET /api/v1/health/` - Estado básico
@@ -215,17 +247,51 @@ class CarrierAdapter(ABC):
     async def get_label(self, shipment_id: str) -> Optional[bytes]
 ```
 
-## ⚙️ Reglas de Negocio
+## ⚙️ Motor de Reglas de Negocio
 
-El motor de reglas determina automáticamente qué transportista usar:
+El motor de reglas determina automáticamente qué transportista usar basándose en las características del pedido:
+
+### Reglas de Selección
+
+1. **Paquetes pesados (>20kg)** → **TIPSA** (maneja paquetes pesados)
+2. **Pago contra reembolso (COD)** → **TIPSA** (soporte COD)
+3. **Servicio express** → **DHL** (entrega rápida)
+4. **Pedidos internacionales** → **DHL** (cobertura mundial)
+5. **Por defecto** → **TIPSA** (envío estándar doméstico)
+
+### Transportistas Soportados
+
+| Transportista | Fortalezas | Peso Máx | Países | Servicios |
+|---------------|------------|----------|--------|-----------|
+| **TIPSA** | Paquetes pesados, COD, Doméstico | 30kg | ES | Estándar, Express |
+| **DHL** | Internacional, Express, Confiabilidad | 70kg | Mundial | Express, Internacional |
+| **OnTime** | Económico, Doméstico, Confiabilidad | 25kg | ES | Estándar |
+| **UPS** | Internacional, Paquetes pesados, Tracking | 70kg | Mundial | Ground, Express, Internacional |
+
+### Configuración de Reglas
+
+Las reglas se pueden personalizar modificando `backend/app/rules/selector.py`:
 
 ```python
-# Ejemplos de reglas
-- Paquetes > 20kg → TIPSA
-- Pedidos COD → TIPSA
-- Servicio express → DHL
-- Pedidos internacionales → DHL
-- Por defecto → TIPSA
+def select_carrier(order: Dict[str, Any]) -> str:
+    # Regla 1: Paquetes pesados
+    if order.get("weight", 0) > 20:
+        return "tipsa"
+    
+    # Regla 2: Pago contra reembolso
+    if order.get("payment_method") == "COD":
+        return "tipsa"
+    
+    # Regla 3: Servicio express
+    if order.get("shipping_speed") == "EXPRESS":
+        return "dhl"
+    
+    # Regla 4: Internacional
+    if order.get("shipping_address", {}).get("country") != "ES":
+        return "dhl"
+    
+    # Por defecto
+    return "tipsa"
 ```
 
 ## 🐳 Docker

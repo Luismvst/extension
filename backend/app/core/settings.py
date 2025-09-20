@@ -13,6 +13,12 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings."""
     
+    model_config = {
+        "extra": "allow",
+        "env_file": ".env",
+        "case_sensitive": False
+    }
+    
     # Application
     app_name: str = "Mirakl-TIPSA Orchestrator"
     app_version: str = "0.2.0"
@@ -38,6 +44,26 @@ class Settings(BaseSettings):
     tipsa_base_url: str = "https://api.tipsa.com"
     tipsa_mock_mode: bool = True
     
+    # OnTime API
+    ontime_api_key: Optional[str] = None
+    ontime_base_url: str = "https://api.ontime.com"
+    ontime_mock_mode: bool = True
+    
+    # DHL API
+    dhl_api_key: Optional[str] = None
+    dhl_api_secret: Optional[str] = None
+    dhl_account: Optional[str] = None
+    dhl_base_url: str = "https://api-eu.dhl.com"
+    dhl_mock_mode: bool = True
+    
+    # UPS API
+    ups_access_key: Optional[str] = None
+    ups_username: Optional[str] = None
+    ups_password: Optional[str] = None
+    ups_account_number: Optional[str] = None
+    ups_base_url: str = "https://onlinetools.ups.com"
+    ups_mock_mode: bool = True
+    
     # Logging
     log_level: str = "INFO"
     log_file: str = "/app/logs/orchestrator.log"
@@ -49,9 +75,7 @@ class Settings(BaseSettings):
     max_weight_kg: float = 30.0
     min_weight_kg: float = 0.1
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Configuration moved to model_config above
 
 
 # Global settings instance
