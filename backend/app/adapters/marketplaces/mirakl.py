@@ -29,7 +29,9 @@ class MiraklAdapter(MarketplaceAdapter):
             "orders": f"{self.base_url}/api/orders",
             "order_details": f"{self.base_url}/api/orders/{{order_id}}",
             "tracking": f"{self.base_url}/api/orders/{{order_id}}/tracking",
-            "status": f"{self.base_url}/api/orders/{{order_id}}/status"
+            "ship": f"{self.base_url}/api/orders/{{order_id}}/ship",
+            "status": f"{self.base_url}/api/orders/{{order_id}}/status",
+            "shipments_tracking": f"{self.base_url}/api/shipments/tracking"
         }
     
     @property
@@ -42,7 +44,7 @@ class MiraklAdapter(MarketplaceAdapter):
         """Check if adapter is in mock mode."""
         return self.mock_mode
     
-    async def get_orders(self, status: str = "SHIPPING", 
+    async def get_orders(self, status: str = "PENDING",  # TODO adaptar esto
                         limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """Get orders from Mirakl (OR12)."""
         if self.mock_mode:
@@ -353,4 +355,140 @@ class MiraklAdapter(MarketplaceAdapter):
         async with httpx.AsyncClient() as client:
             response = await client.put(url, headers=headers, json=data)
             response.raise_for_status()
+            return response.json()
+    
+    async def update_order_ship(self, order_id: str, carrier_code: str, 
+                               carrier_name: str, tracking_number: str) -> Dict[str, Any]:
+        """
+        Update order status to SHIPPED (OR24).
+        
+        Reference: https://developer.mirakl.net/api-reference/order-management-api/order-management-api/orders/put-orders-order-id-ship
+        
+        Args:
+            order_id: Order ID
+            carrier_code: Carrier code (e.g., 'tipsa', 'dhl')
+            carrier_name: Carrier name (e.g., 'TIPSA', 'DHL')
+            tracking_number: Tracking number
+            
+        Returns:
+            Response data
+        """
+        if self.mock_mode:
+            return await self._update_order_ship_mock(order_id, carrier_code, carrier_name, tracking_number)
+        
+        return await self._update_order_ship_real(order_id, carrier_code, carrier_name, tracking_number)
+    
+    async def _update_order_ship_mock(self, order_id: str, carrier_code: str, 
+                                    carrier_name: str, tracking_number: str) -> Dict[str, Any]:
+        """Mock implementation of update_order_ship."""
+        csv_logger.log_operation(
+            operation="update_order_ship",
+            order_id=order_id,
+            status="SUCCESS",
+            details=f"Mock: Order {order_id} marked as SHIPPED with {carrier_name} {tracking_number}"
+        )
+        
+        return {
+            "order_id": order_id,
+            "status": "SHIPPED",
+            "carrier_code": carrier_code,
+            "carrier_name": carrier_name,
+            "tracking_number": tracking_number,
+            "shipped_at": datetime.utcnow().isoformat()
+        }
+    
+    async def _update_order_ship_real(self, order_id: str, carrier_code: str, 
+                                    carrier_name: str, tracking_number: str) -> Dict[str, Any]:
+        """Real implementation of update_order_ship."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "carrier_code": carrier_code,
+            "carrier_name": carrier_name,
+            "tracking_number": tracking_number,
+            "shipped_at": datetime.utcnow().isoformat()
+        }
+        
+        url = self.endpoints["ship"].format(order_id=order_id)
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.put(url, headers=headers, json=data)
+            response.raise_for_status()
+            # OR24 returns 204 No Content, so no JSON response
+            if response.status_code == 204:
+                return {"status": "success", "order_id": order_id}
+            return response.json()
+    
+    async def update_shipments_tracking(self, shipments: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Update tracking for multiple shipments (ST23).
+        
+        Reference: https://developer.mirakl.net/api-reference/order-management-api/shipment-management-api/shipments/post-shipments-tracking
+        
+        Args:
+            shipments: List of shipment tracking data
+            
+        Returns:
+            Response data
+        """
+        if self.mock_mode:
+            return await self._update_shipments_tracking_mock(shipments)
+        
+        return await self._update_shipments_tracking_real(shipments)
+    
+    async def _update_shipments_tracking_mock(self, shipments: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Mock implementation of update_shipments_tracking."""
+        csv_logger.log_operation(
+            operation="update_shipments_tracking",
+            order_id="",
+            status="SUCCESS",
+            details=f"Mock: Updated tracking for {len(shipments)} shipments"
+        )
+        
+        return {
+            "updated_shipments": len(shipments),
+            "shipments": [
+                {
+                    "shipment_id": shipment.get("shipment_id"),
+                    "order_id": shipment.get("order_id"),
+                    "status": "TRACKING_UPDATED",
+                    "carrier_code": shipment.get("carrier_code"),
+                    "carrier_name": shipment.get("carrier_name"),
+                    "tracking_number": shipment.get("tracking_number")
+                }
+                for shipment in shipments
+            ]
+        }
+    
+    async def _update_shipments_tracking_real(self, shipments: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Real implementation of update_shipments_tracking."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "shipments": [
+                {
+                    "shipment_id": shipment.get("shipment_id"),
+                    "order_id": shipment.get("order_id"),
+                    "carrier_code": shipment.get("carrier_code"),
+                    "carrier_name": shipment.get("carrier_name"),
+                    "carrier_url": shipment.get("carrier_url"),
+                    "carrier_standard_code": shipment.get("carrier_standard_code"),
+                    "tracking_number": shipment.get("tracking_number")
+                }
+                for shipment in shipments
+            ]
+        }
+        
+        url = self.endpoints["shipments_tracking"]
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=data)
+            response.raise_for_status()
+            # ST23 returns 200 OK with response data
             return response.json()

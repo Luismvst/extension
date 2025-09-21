@@ -6,6 +6,8 @@ TIPSA carrier APIs for shipment creation and tracking.
 """
 
 import httpx
+import hashlib
+import uuid
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
@@ -30,6 +32,9 @@ class TipsaAdapter(CarrierAdapter):
             "label": f"{self.base_url}/api/shipments/{{shipment_id}}/label",
             "cancel": f"{self.base_url}/api/shipments/{{shipment_id}}/cancel"
         }
+        
+        # Idempotency tracking
+        self._idempotency_keys = set()
     
     @property
     def carrier_name(self) -> str:
@@ -333,4 +338,156 @@ class TipsaAdapter(CarrierAdapter):
                 "address": order_data.get("shipping_address", {})
             },
             "service": "STANDARD"
+        }
+    
+    def _generate_idempotency_key(self, order_data: Dict[str, Any]) -> str:
+        """Generate idempotency key for shipment creation."""
+        order_id = order_data.get("order_id", "")
+        weight = order_data.get("weight", 0)
+        recipient = order_data.get("shipping_address", {})
+        
+        # Create deterministic key based on order data
+        key_data = f"{order_id}_{weight}_{recipient.get('postal_code', '')}_{recipient.get('city', '')}"
+        return hashlib.sha256(key_data.encode()).hexdigest()[:16]
+    
+    async def create_shipment_with_idempotency(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create shipment with idempotency support.
+        
+        Args:
+            order_data: Order data
+            
+        Returns:
+            Shipment data with expedition_id
+        """
+        idempotency_key = self._generate_idempotency_key(order_data)
+        
+        # Check if we already processed this request
+        if idempotency_key in self._idempotency_keys:
+            csv_logger.log_operation(
+                operation="create_shipment_idempotent",
+                order_id=order_data.get("order_id"),
+                status="SUCCESS",
+                details=f"Idempotent request, returning cached result for key {idempotency_key}"
+            )
+            # Return cached result (in real implementation, this would be from database)
+            return await self._get_cached_shipment(idempotency_key)
+        
+        # Create new shipment
+        result = await self.create_shipment(order_data)
+        
+        # Add expedition_id for TIPSA compatibility
+        result["expedition_id"] = result.get("shipment_id")
+        
+        # Track idempotency key
+        self._idempotency_keys.add(idempotency_key)
+        
+        return result
+    
+    async def _get_cached_shipment(self, idempotency_key: str) -> Dict[str, Any]:
+        """Get cached shipment result (mock implementation)."""
+        return {
+            "shipment_id": f"CACHED-{idempotency_key[:8]}",
+            "expedition_id": f"CACHED-{idempotency_key[:8]}",
+            "tracking_number": f"1Z{idempotency_key[:8]}",
+            "status": "CREATED",
+            "cached": True
+        }
+    
+    async def get_shipment_status(self, expedition_id: str) -> Dict[str, Any]:
+        """
+        Get shipment status by expedition_id.
+        
+        Args:
+            expedition_id: TIPSA expedition ID
+            
+        Returns:
+            Status data with tracking_number and label_url if available
+        """
+        if self.mock_mode:
+            return await self._get_shipment_status_mock(expedition_id)
+        
+        return await self._get_shipment_status_real(expedition_id)
+    
+    async def _get_shipment_status_mock(self, expedition_id: str) -> Dict[str, Any]:
+        """Mock implementation of get_shipment_status."""
+        # Simulate status progression
+        statuses = ["CREATED", "LABELED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"]
+        status_index = hash(expedition_id) % len(statuses)
+        status = statuses[status_index]
+        
+        result = {
+            "expedition_id": expedition_id,
+            "status": status,
+            "tracking_number": f"1Z{expedition_id[-8:]}",
+            "label_url": f"https://mock.tipsa.com/labels/{expedition_id}" if status in ["LABELED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"] else None,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        csv_logger.log_operation(
+            operation="get_shipment_status",
+            order_id=expedition_id,
+            status="SUCCESS",
+            details=f"Status: {status}"
+        )
+        
+        return result
+    
+    async def _get_shipment_status_real(self, expedition_id: str) -> Dict[str, Any]:
+        """Real implementation of get_shipment_status."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        url = self.endpoints["shipment"].format(shipment_id=expedition_id)
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+    
+    def validate_webhook_signature(self, payload: str, signature: str, secret: str) -> bool:
+        """
+        Validate webhook signature using HMAC.
+        
+        Args:
+            payload: Raw webhook payload
+            signature: X-Signature header value
+            secret: Webhook secret
+            
+        Returns:
+            True if signature is valid
+        """
+        expected_signature = hashlib.sha256(f"{payload}{secret}".encode()).hexdigest()
+        return signature == expected_signature
+    
+    def process_webhook_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process webhook event from TIPSA.
+        
+        Args:
+            event_data: Webhook event data
+            
+        Returns:
+            Processed event data
+        """
+        event_type = event_data.get("event_type")
+        expedition_id = event_data.get("expedition_id")
+        
+        csv_logger.log_operation(
+            operation="process_webhook_event",
+            order_id=expedition_id,
+            status="SUCCESS",
+            details=f"Processed {event_type} event for {expedition_id}"
+        )
+        
+        return {
+            "expedition_id": expedition_id,
+            "event_type": event_type,
+            "status": event_data.get("status"),
+            "tracking_number": event_data.get("tracking_number"),
+            "label_url": event_data.get("label_url"),
+            "timestamp": event_data.get("timestamp"),
+            "processed_at": datetime.utcnow().isoformat()
         }

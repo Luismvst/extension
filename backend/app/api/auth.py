@@ -30,7 +30,7 @@ auth_manager = AuthManager()
 # Request/Response models
 class LoginRequest(BaseModel):
     """Login request model."""
-    username: str
+    email: str
     password: str
 
 class LoginResponse(BaseModel):
@@ -53,26 +53,28 @@ async def login(request: LoginRequest):
     This endpoint authenticates a user with username and password,
     returning a JWT token for subsequent API calls.
     """
-    logger.info(f"Login attempt for user: {request.username}")
+    logger.info(f"Login attempt for user: {request.email}")
     
-    # For demo purposes, accept any username/password
-    if request.username and request.password:
+    # For demo purposes, accept any email/password
+    if request.email and request.password:
         access_token = auth_manager.create_token({
-            "sub": request.username,
+            "sub": request.email,
+            "email": request.email,
+            "name": request.email.split('@')[0],
             "scopes": ["read", "write"]
         })
         
-        logger.info(f"Successful login for user: {request.username}")
+        logger.info(f"Successful login for user: {request.email}")
         return LoginResponse(
             access_token=access_token,
             token_type="bearer",
             expires_in=settings.jwt_expire_minutes * 60
         )
     else:
-        logger.warning(f"Failed login attempt for user: {request.username}")
+        logger.warning(f"Failed login attempt for user: {request.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Username and password are required",
+            detail="Email and password are required",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

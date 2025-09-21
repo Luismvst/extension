@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # Mirakl API
     mirakl_api_key: Optional[str] = None
     mirakl_shop_id: Optional[str] = None
-    mirakl_base_url: str = "https://marketplace.mirakl.net"
+    mirakl_base_url: str = "https://marketplace.mirakl.net" # https://sandbox.mirakl.net
     mirakl_mock_mode: bool = True
     
     # TIPSA API
@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     ups_account_number: Optional[str] = None
     ups_base_url: str = "https://onlinetools.ups.com"
     ups_mock_mode: bool = True
+    
+    # SEUR API
+    seur_api_key: Optional[str] = None
+    seur_base_url: str = "https://api.seur.com"
+    seur_mock_mode: bool = True
+    
+    # Correos Express API
+    correosex_api_key: Optional[str] = None
+    correosex_base_url: str = "https://api.correosex.com"
+    correosex_mock_mode: bool = True
     
     # Logging
     log_level: str = "INFO"

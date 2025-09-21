@@ -1,10 +1,10 @@
 """
-OnTime carrier adapter.
+Correos Express carrier adapter.
 
-This module implements the OnTimeAdapter for interacting with
-OnTime carrier APIs for shipment creation and tracking.
+This module implements the CorreosExAdapter for interacting with
+Correos Express carrier APIs for shipment creation and tracking.
 
-Reference: https://ontime360.com
+Reference: https://clickpost.ai (integration examples)
 """
 
 import httpx
@@ -18,14 +18,14 @@ from ...core.settings import settings
 from ...core.logging import csv_logger, json_dumper
 
 
-class OnTimeAdapter(CarrierAdapter):
-    """OnTime carrier adapter implementation."""
+class CorreosExAdapter(CarrierAdapter):
+    """Correos Express carrier adapter implementation."""
     
     def __init__(self):
-        """Initialize OnTime adapter."""
-        self.api_key = settings.ontime_api_key
-        self.base_url = settings.ontime_base_url
-        self.mock_mode = settings.ontime_mock_mode
+        """Initialize Correos Express adapter."""
+        self.api_key = settings.correosex_api_key
+        self.base_url = settings.correosex_base_url
+        self.mock_mode = settings.correosex_mock_mode
         
         # API endpoints
         self.endpoints = {
@@ -42,12 +42,12 @@ class OnTimeAdapter(CarrierAdapter):
     @property
     def carrier_name(self) -> str:
         """Get carrier name."""
-        return "OnTime"
+        return "Correos Express"
     
     @property
     def carrier_code(self) -> str:
         """Get carrier code."""
-        return "ontime"
+        return "correosex"
     
     @property
     def is_mock_mode(self) -> bool:
@@ -67,19 +67,19 @@ class OnTimeAdapter(CarrierAdapter):
         weight = order_data.get("weight", 1.0)
         
         # Generate mock shipment data
-        shipment_id = f"ONTIME-{order_id[-8:].upper()}{hash(order_id) % 10000:04d}"
-        tracking_number = f"OT{order_id[-8:].upper()}{hash(order_id) % 10000:04d}"
+        shipment_id = f"CEX-{order_id[-8:].upper()}{hash(order_id) % 10000:04d}"
+        tracking_number = f"CE{order_id[-8:].upper()}{hash(order_id) % 10000:04d}"
         
         result = {
             "shipment_id": shipment_id,
-            "expedition_id": shipment_id,  # OnTime uses shipment_id as expedition_id
+            "expedition_id": shipment_id,  # Correos Express uses shipment_id as expedition_id
             "tracking_number": tracking_number,
             "status": "CREATED",
-            "label_url": f"https://mock.ontime.com/labels/{shipment_id}",
-            "estimated_delivery": (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            "cost": 12.50 + (weight * 1.5),
+            "label_url": f"https://mock.correosex.com/labels/{shipment_id}",
+            "estimated_delivery": (datetime.utcnow() + timedelta(days=2)).isoformat(),
+            "cost": 16.25 + (weight * 2.0),
             "currency": "EUR",
-            "carrier": "OnTime",
+            "carrier": "Correos Express",
             "service": "EXPRESS",
             "created_at": datetime.utcnow().isoformat()
         }
@@ -89,8 +89,8 @@ class OnTimeAdapter(CarrierAdapter):
             operation="create_shipment",
             order_id=order_id,
             status="SUCCESS",
-            details=f"Created OnTime shipment {shipment_id}",
-            duration_ms=150
+            details=f"Created Correos Express shipment {shipment_id}",
+            duration_ms=180
         )
         
         return result
@@ -100,10 +100,10 @@ class OnTimeAdapter(CarrierAdapter):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "X-API-Version": "v2"
+            "X-API-Version": "v1"
         }
         
-        # Transform order data to OnTime format
+        # Transform order data to Correos Express format
         shipment_data = self._transform_order_to_shipment(order_data)
         
         async with httpx.AsyncClient() as client:
@@ -135,14 +135,14 @@ class OnTimeAdapter(CarrierAdapter):
             operation="create_shipments_bulk",
             order_id="",
             status="SUCCESS",
-            details=f"Created {len(shipments)} OnTime shipments",
-            duration_ms=len(orders) * 150
+            details=f"Created {len(shipments)} Correos Express shipments",
+            duration_ms=len(orders) * 180
         )
         
         return {
             "shipments": shipments,
             "total_created": len(shipments),
-            "carrier": "OnTime"
+            "carrier": "Correos Express"
         }
     
     async def _create_shipments_bulk_real(self, orders: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -150,7 +150,7 @@ class OnTimeAdapter(CarrierAdapter):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "X-API-Version": "v2"
+            "X-API-Version": "v1"
         }
         
         shipments_data = [self._transform_order_to_shipment(order) for order in orders]
@@ -166,7 +166,7 @@ class OnTimeAdapter(CarrierAdapter):
             return response.json()
     
     def _transform_order_to_shipment(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform order data to OnTime shipment format."""
+        """Transform order data to Correos Express shipment format."""
         return {
             "order_id": order_data.get("order_id"),
             "weight": order_data.get("weight", 1.0),
@@ -178,7 +178,7 @@ class OnTimeAdapter(CarrierAdapter):
                 "address": order_data.get("shipping_address", {})
             },
             "service": "EXPRESS",
-            "priority": "HIGH"
+            "signature_required": True
         }
     
     def _generate_idempotency_key(self, order_data: Dict[str, Any]) -> str:
@@ -218,7 +218,7 @@ class OnTimeAdapter(CarrierAdapter):
         return {
             "shipment_id": f"CACHED-{idempotency_key[:8]}",
             "expedition_id": f"CACHED-{idempotency_key[:8]}",
-            "tracking_number": f"OT{idempotency_key[:8]}",
+            "tracking_number": f"CE{idempotency_key[:8]}",
             "status": "CREATED",
             "cached": True
         }
@@ -240,8 +240,8 @@ class OnTimeAdapter(CarrierAdapter):
         result = {
             "expedition_id": expedition_id,
             "status": status,
-            "tracking_number": f"OT{expedition_id[-8:]}",
-            "label_url": f"https://mock.ontime.com/labels/{expedition_id}" if status in ["LABELED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"] else None,
+            "tracking_number": f"CE{expedition_id[-8:]}",
+            "label_url": f"https://mock.correosex.com/labels/{expedition_id}" if status in ["LABELED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"] else None,
             "updated_at": datetime.utcnow().isoformat()
         }
         
@@ -249,7 +249,7 @@ class OnTimeAdapter(CarrierAdapter):
             operation="get_shipment_status",
             order_id=expedition_id,
             status="SUCCESS",
-            details=f"OnTime status: {status}"
+            details=f"Correos Express status: {status}"
         )
         
         return result
@@ -274,7 +274,7 @@ class OnTimeAdapter(CarrierAdapter):
         return signature == expected_signature
     
     def process_webhook_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process webhook event from OnTime."""
+        """Process webhook event from Correos Express."""
         event_type = event_data.get("event_type")
         expedition_id = event_data.get("expedition_id")
         
@@ -282,7 +282,7 @@ class OnTimeAdapter(CarrierAdapter):
             operation="process_webhook_event",
             order_id=expedition_id,
             status="SUCCESS",
-            details=f"Processed OnTime {event_type} event for {expedition_id}"
+            details=f"Processed Correos Express {event_type} event for {expedition_id}"
         )
         
         return {

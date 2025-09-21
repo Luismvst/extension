@@ -8,15 +8,20 @@ between marketplaces and carriers for the Mirakl-TIPSA Orchestrator.
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, List
 import time
+import json
+from datetime import datetime
 
 from ..adapters.marketplaces.mirakl import MiraklAdapter
 from ..adapters.carriers.tipsa import TipsaAdapter
 from ..adapters.carriers.ontime import OnTimeAdapter
+from ..adapters.carriers.seur import SeurAdapter
+from ..adapters.carriers.correosex import CorreosExAdapter
 from ..adapters.carriers.dhl import DHLAdapter
 from ..adapters.carriers.ups import UPSAdapter
 from ..rules.selector import select_carrier, get_carrier_info
 from ..core.auth import get_current_user
 from ..core.logging import csv_logger, json_dumper
+from ..core.unified_logger import unified_logger
 
 # Create router
 router = APIRouter(prefix="/api/v1/orchestrator", tags=["orchestrator"])
@@ -25,6 +30,8 @@ router = APIRouter(prefix="/api/v1/orchestrator", tags=["orchestrator"])
 mirakl_adapter = MiraklAdapter()
 tipsa_adapter = TipsaAdapter()
 ontime_adapter = OnTimeAdapter()
+seur_adapter = SeurAdapter()
+correosex_adapter = CorreosExAdapter()
 dhl_adapter = DHLAdapter()
 ups_adapter = UPSAdapter()
 
@@ -32,6 +39,8 @@ ups_adapter = UPSAdapter()
 CARRIER_ADAPTERS = {
     "tipsa": tipsa_adapter,
     "ontime": ontime_adapter,
+    "seur": seur_adapter,
+    "correosex": correosex_adapter,
     "dhl": dhl_adapter,
     "ups": ups_adapter
 }
@@ -328,6 +337,318 @@ async def get_orchestrator_status(
                 "supported_carriers": list(CARRIER_ADAPTERS.keys())
             },
             "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/fetch-orders")
+async def fetch_orders_from_mirakl(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Fetch orders from Mirakl and save to unified CSV.
+    
+    Args:
+        current_user: Authenticated user
+        
+    Returns:
+        Fetch results with orders saved to CSV
+    """
+    start_time = time.time()
+    
+    try:
+        # Fetch orders from Mirakl
+        mirakl_result = await mirakl_adapter.get_orders(status="PENDING", limit=100, offset=0)
+        orders = mirakl_result.get("orders", [])
+        
+        if not orders:
+            return {
+                "success": True,
+                "message": "No orders found to process",
+                "orders_fetched": 0
+            }
+        
+        # Save orders to unified CSV
+        for order in orders:
+            unified_logger.upsert_order({
+                'mirakl_order_id': order.get('order_id'),
+                'mirakl_status': order.get('status'),
+                'mirakl_customer_name': order.get('customer_name'),
+                'mirakl_customer_email': order.get('customer_email'),
+                'mirakl_weight': order.get('weight'),
+                'mirakl_total_amount': order.get('total_amount'),
+                'mirakl_currency': order.get('currency'),
+                'mirakl_created_at': order.get('created_at'),
+                'mirakl_shipping_address': json.dumps(order.get('shipping_address', {})),
+                'internal_state': 'PENDING_POST',
+                'last_event': 'FETCHED_FROM_MIRAKL',
+                'last_event_at': datetime.utcnow().isoformat()
+            })
+        
+        # Log operation
+        duration_ms = int((time.time() - start_time) * 1000)
+        csv_logger.log_operation(
+            operation="fetch_orders_from_mirakl",
+            order_id="",
+            status="SUCCESS",
+            details=f"Fetched {len(orders)} orders from Mirakl",
+            duration_ms=duration_ms
+        )
+        
+        return {
+            "success": True,
+            "message": f"Successfully fetched {len(orders)} orders from Mirakl",
+            "orders_fetched": len(orders),
+            "orders": orders
+        }
+        
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        csv_logger.log_operation(
+            operation="fetch_orders_from_mirakl",
+            order_id="",
+            status="ERROR",
+            details=str(e),
+            duration_ms=duration_ms
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/post-to-carrier")
+async def post_to_carrier(
+    carrier: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Post pending orders to specified carrier.
+    
+    Args:
+        carrier: Carrier code
+        current_user: Authenticated user
+        
+    Returns:
+        Post results with created shipments
+    """
+    start_time = time.time()
+    
+    if carrier not in CARRIER_ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unsupported carrier: {carrier}")
+    
+    try:
+        # Get pending orders from unified CSV
+        orders_result = unified_logger.get_orders(state="PENDING_POST", limit=50)
+        orders = orders_result.get("orders", [])
+        
+        if not orders:
+            return {
+                "success": True,
+                "message": "No pending orders found",
+                "orders_processed": 0,
+                "shipments_created": 0
+            }
+        
+        # Transform to order format
+        order_data = []
+        for order in orders:
+            order_data.append({
+                "order_id": order.get("mirakl_order_id"),
+                "customer_name": order.get("mirakl_customer_name"),
+                "customer_email": order.get("mirakl_customer_email"),
+                "weight": float(order.get("mirakl_weight", 0)),
+                "total_amount": float(order.get("mirakl_total_amount", 0)),
+                "currency": order.get("mirakl_currency", "EUR"),
+                "shipping_address": json.loads(order.get("mirakl_shipping_address", "{}"))
+            })
+        
+        # Create shipments with carrier
+        adapter = CARRIER_ADAPTERS[carrier]
+        result = await adapter.create_shipments_bulk(order_data)
+        shipments = result.get("shipments", [])
+        
+        # Update orders in unified CSV
+        for i, order in enumerate(orders):
+            if i < len(shipments):
+                shipment = shipments[i]
+                unified_logger.upsert_order({
+                    'mirakl_order_id': order.get('mirakl_order_id'),
+                    'carrier_code': carrier,
+                    'carrier_name': adapter.carrier_name,
+                    'expedition_id': shipment.get('expedition_id'),
+                    'tracking_number': shipment.get('tracking_number'),
+                    'carrier_status': shipment.get('status'),
+                    'label_url': shipment.get('label_url'),
+                    'carrier_cost': shipment.get('cost'),
+                    'carrier_created_at': shipment.get('created_at'),
+                    'internal_state': 'POSTED',
+                    'last_event': 'POSTED_TO_CARRIER',
+                    'last_event_at': datetime.utcnow().isoformat()
+                })
+        
+        # Log operation
+        duration_ms = int((time.time() - start_time) * 1000)
+        csv_logger.log_operation(
+            operation="post_to_carrier",
+            order_id="",
+            status="SUCCESS",
+            details=f"Posted {len(orders)} orders to {carrier}, created {len(shipments)} shipments",
+            duration_ms=duration_ms
+        )
+        
+        return {
+            "success": True,
+            "message": f"Successfully posted {len(orders)} orders to {carrier}",
+            "orders_processed": len(orders),
+            "shipments_created": len(shipments),
+            "shipments": shipments
+        }
+        
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        csv_logger.log_operation(
+            operation="post_to_carrier",
+            order_id="",
+            status="ERROR",
+            details=str(e),
+            duration_ms=duration_ms
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/push-tracking-to-mirakl")
+async def push_tracking_to_mirakl(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Push tracking information to Mirakl for orders with tracking.
+    
+    Args:
+        current_user: Authenticated user
+        
+    Returns:
+        Push results with updated orders
+    """
+    start_time = time.time()
+    
+    try:
+        # Get orders with tracking (AWAITING_TRACKING state)
+        orders_result = unified_logger.get_orders(state="AWAITING_TRACKING", limit=50)
+        orders = orders_result.get("orders", [])
+        
+        if not orders:
+            return {
+                "success": True,
+                "message": "No orders with tracking found",
+                "orders_updated": 0
+            }
+        
+        # Update tracking in Mirakl
+        updated_orders = 0
+        for order in orders:
+            try:
+                order_id = order.get("mirakl_order_id")
+                tracking_number = order.get("tracking_number")
+                carrier_code = order.get("carrier_code")
+                carrier_name = order.get("carrier_name")
+                
+                if not all([order_id, tracking_number, carrier_code, carrier_name]):
+                    continue
+                
+                # Update tracking (OR23)
+                await mirakl_adapter.update_order_tracking(
+                    order_id, tracking_number, carrier_code, carrier_name
+                )
+                
+                # Update order status to SHIPPED (OR24)
+                await mirakl_adapter.update_order_ship(
+                    order_id, carrier_code, carrier_name, tracking_number
+                )
+                
+                # Update unified CSV
+                unified_logger.upsert_order({
+                    'mirakl_order_id': order_id,
+                    'internal_state': 'MIRAKL_OK',
+                    'last_event': 'TRACKING_PUSHED_TO_MIRAKL',
+                    'last_event_at': datetime.utcnow().isoformat()
+                })
+                
+                updated_orders += 1
+                
+            except Exception as e:
+                # Log error but continue with other orders
+                unified_logger.log_event(
+                    order.get("mirakl_order_id"),
+                    "FAILED_MIRAKL_UPDATE",
+                    str(e)
+                )
+                continue
+        
+        # Log operation
+        duration_ms = int((time.time() - start_time) * 1000)
+        csv_logger.log_operation(
+            operation="push_tracking_to_mirakl",
+            order_id="",
+            status="SUCCESS",
+            details=f"Updated tracking for {updated_orders} orders in Mirakl",
+            duration_ms=duration_ms
+        )
+        
+        return {
+            "success": True,
+            "message": f"Successfully updated tracking for {updated_orders} orders in Mirakl",
+            "orders_updated": updated_orders,
+            "total_orders": len(orders)
+        }
+        
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        csv_logger.log_operation(
+            operation="push_tracking_to_mirakl",
+            order_id="",
+            status="ERROR",
+            details=str(e),
+            duration_ms=duration_ms
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/orders-view")
+async def get_orders_view(
+    state: str = None,
+    carrier: str = None,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Get unified orders view.
+    
+    Args:
+        state: Filter by internal state
+        carrier: Filter by carrier code
+        limit: Maximum number of orders to return
+        offset: Number of orders to skip
+        current_user: Authenticated user
+        
+    Returns:
+        Unified orders view with filtering and pagination
+    """
+    try:
+        result = unified_logger.get_orders(
+            state=state,
+            carrier=carrier,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "success": True,
+            "orders": result.get("orders", []),
+            "total": result.get("total", 0),
+            "limit": limit,
+            "offset": offset,
+            "has_more": result.get("has_more", False)
         }
         
     except Exception as e:

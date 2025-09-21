@@ -1,126 +1,123 @@
 """
 Carrier API endpoints.
 
-This module contains all carrier-related API endpoints
-for the Mirakl-TIPSA Orchestrator.
+This module contains REST endpoints for carrier operations including
+shipment creation, status checking, and webhook handling.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any, List
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
+from typing import Dict, Any, List, Optional
 import time
+import hashlib
+import hmac
+from datetime import datetime, timedelta
 
 from ..adapters.carriers.tipsa import TipsaAdapter
+from ..adapters.carriers.ontime import OnTimeAdapter
+from ..adapters.carriers.seur import SeurAdapter
+from ..adapters.carriers.correosex import CorreosExAdapter
 from ..core.auth import get_current_user
 from ..core.logging import csv_logger, json_dumper
+from ..core.settings import settings
 
 # Create router
 router = APIRouter(prefix="/api/v1/carriers", tags=["carriers"])
 
-# Initialize adapter
+# Initialize adapters
 tipsa_adapter = TipsaAdapter()
+ontime_adapter = OnTimeAdapter()
+seur_adapter = SeurAdapter()
+correosex_adapter = CorreosExAdapter()
+
+# Carrier mapping
+CARRIER_ADAPTERS = {
+    "tipsa": tipsa_adapter,
+    "ontime": ontime_adapter,
+    "seur": seur_adapter,
+    "correosex": correosex_adapter
+}
+
+# Webhook secrets (in production, these should be in environment variables)
+WEBHOOK_SECRETS = {
+    "tipsa": "tipsa_webhook_secret_2025",
+    "ontime": "ontime_webhook_secret_2025",
+    "seur": "seur_webhook_secret_2025",
+    "correosex": "correosex_webhook_secret_2025"
+}
 
 
-@router.post("/tipsa/shipments")
-async def create_tipsa_shipment(
-    order_data: Dict[str, Any],
+@router.post("/{carrier}/shipments")
+async def create_shipments(
+    carrier: str,
+    orders: List[Dict[str, Any]],
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Create a single TIPSA shipment.
+    Create shipments with specified carrier (batch).
     
     Args:
-        order_data: Order information
-        current_user: Authenticated user (from JWT)
-    
+        carrier: Carrier code (tipsa, ontime, seur, correosex)
+        orders: List of order data
+        current_user: Authenticated user
+        
     Returns:
-        Shipment details
+        Jobs array with expedition_id for each shipment
     """
     start_time = time.time()
     
+    if carrier not in CARRIER_ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unsupported carrier: {carrier}")
+    
+    adapter = CARRIER_ADAPTERS[carrier]
+    
     try:
-        # Create shipment in TIPSA
-        result = await tipsa_adapter.create_shipment(order_data)
+        # Create shipments with idempotency
+        jobs = []
+        for order in orders:
+            try:
+                result = await adapter.create_shipment_with_idempotency(order)
+                jobs.append({
+                    "order_id": order.get("order_id"),
+                    "expedition_id": result.get("expedition_id"),
+                    "status": "CREATED",
+                    "carrier": carrier,
+                    "created_at": datetime.utcnow().isoformat()
+                })
+            except Exception as e:
+                jobs.append({
+                    "order_id": order.get("order_id"),
+                    "expedition_id": None,
+                    "status": "ERROR",
+                    "error": str(e),
+                    "carrier": carrier,
+                    "created_at": datetime.utcnow().isoformat()
+                })
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
+        successful_jobs = [job for job in jobs if job["status"] == "CREATED"]
+        
         csv_logger.log_operation(
-            operation="create_tipsa_shipment",
-            order_id=order_data.get("order_id", "UNKNOWN"),
+            operation="create_shipments_batch",
+            order_id="",
             status="SUCCESS",
-            details=f"Created shipment {result.get('shipment_id')}",
+            details=f"Created {len(successful_jobs)}/{len(jobs)} shipments with {carrier}",
             duration_ms=duration_ms
         )
         
-        # Dump request/response
-        json_dumper.dump_request_response(
-            operation="create_tipsa_shipment",
-            order_id=order_data.get("order_id", "UNKNOWN"),
-            request_data=order_data,
-            response_data=result
-        )
-        
-        return result
+        return {
+            "success": True,
+            "carrier": carrier,
+            "total_orders": len(orders),
+            "successful_shipments": len(successful_jobs),
+            "failed_shipments": len(jobs) - len(successful_jobs),
+            "jobs": jobs
+        }
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
         csv_logger.log_operation(
-            operation="create_tipsa_shipment",
-            order_id=order_data.get("order_id", "UNKNOWN"),
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/tipsa/shipments/bulk")
-async def create_tipsa_shipments_bulk(
-    request_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """
-    Create multiple TIPSA shipments in bulk.
-    
-    Args:
-        request_data: Request data containing shipments list
-        current_user: Authenticated user (from JWT)
-    
-    Returns:
-        Bulk shipment results
-    """
-    start_time = time.time()
-    
-    try:
-        # Extract shipments from request data
-        orders_data = request_data.get("shipments", [])
-        
-        # Create shipments in TIPSA
-        result = await tipsa_adapter.create_shipments_bulk(orders_data)
-        
-        # Log operation
-        duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="create_tipsa_shipments_bulk",
-            order_id="",
-            status="SUCCESS",
-            details=f"Created {result.get('total_created', 0)} shipments",
-            duration_ms=duration_ms
-        )
-        
-        # Dump request/response
-        json_dumper.dump_request_response(
-            operation="create_tipsa_shipments_bulk",
-            order_id="",
-            request_data=request_data,
-            response_data=result
-        )
-        
-        return result
-        
-    except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="create_tipsa_shipments_bulk",
+            operation="create_shipments_batch",
             order_id="",
             status="ERROR",
             details=str(e),
@@ -129,290 +126,182 @@ async def create_tipsa_shipments_bulk(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tipsa/shipments/{shipment_id}")
-async def get_tipsa_shipment_status(
-    shipment_id: str,
+@router.get("/{carrier}/shipments/{expedition_id}")
+async def get_shipment_status(
+    carrier: str,
+    expedition_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Get TIPSA shipment status and tracking information.
+    Get shipment status and label (fallback).
     
     Args:
-        shipment_id: Shipment identifier
-        current_user: Authenticated user (from JWT)
-    
+        carrier: Carrier code
+        expedition_id: Expedition/shipment ID
+        current_user: Authenticated user
+        
     Returns:
-        Shipment status and tracking info
+        Status data with tracking_number and label_url if available
     """
-    start_time = time.time()
+    if carrier not in CARRIER_ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unsupported carrier: {carrier}")
+    
+    adapter = CARRIER_ADAPTERS[carrier]
     
     try:
-        # Get shipment status from TIPSA
-        result = await tipsa_adapter.get_shipment_status(shipment_id)
+        result = await adapter.get_shipment_status(expedition_id)
         
-        # Log operation
-        duration_ms = int((time.time() - start_time) * 1000)
         csv_logger.log_operation(
-            operation="get_tipsa_shipment_status",
-            order_id=shipment_id,
+            operation="get_shipment_status",
+            order_id=expedition_id,
             status="SUCCESS",
-            details=f"Retrieved status: {result.get('status')}",
-            duration_ms=duration_ms
+            details=f"Retrieved status for {carrier} shipment {expedition_id}"
         )
         
         return result
         
     except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
         csv_logger.log_operation(
-            operation="get_tipsa_shipment_status",
-            order_id=shipment_id,
+            operation="get_shipment_status",
+            order_id=expedition_id,
             status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
+            details=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tipsa/shipments/{shipment_id}/label")
-async def get_tipsa_shipment_label(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+@router.post("/webhooks/{carrier}")
+async def receive_webhook(
+    carrier: str,
+    request: Request,
+    x_signature: Optional[str] = Header(None),
+    x_timestamp: Optional[str] = Header(None)
 ):
     """
-    Get TIPSA shipment label as PDF.
+    Receive webhook events from carriers.
     
     Args:
-        shipment_id: Shipment identifier
-        current_user: Authenticated user (from JWT)
-    
+        carrier: Carrier code
+        request: FastAPI request object
+        x_signature: X-Signature header for HMAC validation
+        x_timestamp: X-Timestamp header for replay protection
+        
     Returns:
-        Label PDF content
+        202 Accepted (always)
     """
-    start_time = time.time()
+    if carrier not in CARRIER_ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unsupported carrier: {carrier}")
+    
+    adapter = CARRIER_ADAPTERS[carrier]
+    secret = WEBHOOK_SECRETS.get(carrier)
+    
+    if not secret:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
     
     try:
-        # Get shipment label from TIPSA
-        label_content = await tipsa_adapter.get_shipment_label(shipment_id)
+        # Get raw payload
+        payload = await request.body()
+        payload_str = payload.decode('utf-8')
         
-        # Log operation
-        duration_ms = int((time.time() - start_time) * 1000)
+        # Validate timestamp (reject if > 5 minutes old)
+        if x_timestamp:
+            try:
+                timestamp = datetime.fromisoformat(x_timestamp.replace('Z', '+00:00'))
+                if datetime.utcnow() - timestamp > timedelta(minutes=5):
+                    raise HTTPException(status_code=400, detail="Webhook timestamp too old")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid timestamp format")
+        
+        # Validate signature
+        if x_signature:
+            if not adapter.validate_webhook_signature(payload_str, x_signature, secret):
+                raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        
+        # Parse JSON payload
+        import json
+        event_data = json.loads(payload_str)
+        
+        # Process webhook event
+        processed_event = adapter.process_webhook_event(event_data)
+        
+        # Log webhook reception
         csv_logger.log_operation(
-            operation="get_tipsa_shipment_label",
-            order_id=shipment_id,
+            operation="receive_webhook",
+            order_id=processed_event.get("expedition_id", ""),
             status="SUCCESS",
-            details="Retrieved label",
-            duration_ms=duration_ms
+            details=f"Processed {carrier} webhook: {processed_event.get('event_type', 'unknown')}"
         )
         
-        return {"content": label_content.decode('utf-8')}
+        # TODO: In production, this would trigger background processing
+        # to update Mirakl with tracking information
         
+        return {"status": "accepted", "carrier": carrier, "processed_at": datetime.utcnow().isoformat()}
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
         csv_logger.log_operation(
-            operation="get_tipsa_shipment_label",
-            order_id=shipment_id,
+            operation="receive_webhook",
+            order_id="",
             status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
+            details=f"Webhook processing error: {str(e)}"
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        # Always return 202 to prevent carrier retries
+        return {"status": "accepted", "error": "Processing failed", "carrier": carrier}
 
 
-@router.post("/tipsa/shipments/{shipment_id}/cancel")
-async def cancel_tipsa_shipment(
-    shipment_id: str,
-    cancel_data: Dict[str, Any],
+@router.get("/{carrier}/health")
+async def get_carrier_health(
+    carrier: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Cancel a TIPSA shipment.
+    Get carrier health status.
     
     Args:
-        shipment_id: Shipment identifier
-        cancel_data: Cancellation information (reason)
-        current_user: Authenticated user (from JWT)
-    
+        carrier: Carrier code
+        current_user: Authenticated user
+        
     Returns:
-        Cancellation result
+        Carrier health information
     """
-    start_time = time.time()
+    if carrier not in CARRIER_ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unsupported carrier: {carrier}")
     
-    try:
-        # Extract cancellation data
-        reason = cancel_data.get("reason")
+    adapter = CARRIER_ADAPTERS[carrier]
+    
+    return {
+        "carrier": carrier,
+        "name": adapter.carrier_name,
+        "status": "healthy" if adapter.is_mock_mode else "unknown",
+        "mode": "mock" if adapter.is_mock_mode else "real",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.get("/health")
+async def get_all_carriers_health(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Get health status for all carriers.
+    
+    Args:
+        current_user: Authenticated user
         
-        # Cancel shipment in TIPSA
-        result = await tipsa_adapter.cancel_shipment(shipment_id, reason)
-        
-        # Log operation
-        duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="cancel_tipsa_shipment",
-            order_id=shipment_id,
-            status="SUCCESS",
-            details=f"Cancelled: {reason or 'No reason provided'}",
-            duration_ms=duration_ms
-        )
-        
-        # Dump request/response
-        json_dumper.dump_request_response(
-            operation="cancel_tipsa_shipment",
-            order_id=shipment_id,
-            request_data=cancel_data,
-            response_data=result
-        )
-        
-        return result
-        
-    except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="cancel_tipsa_shipment",
-            order_id=shipment_id,
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# OnTime endpoints
-@router.post("/ontime/shipments")
-async def create_ontime_shipment(
-    shipment_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Create a single OnTime shipment."""
-    from ..adapters.carriers.ontime import OnTimeAdapter
-    adapter = OnTimeAdapter()
-    return await adapter.create_shipment(shipment_data)
-
-
-@router.post("/ontime/shipments/bulk")
-async def create_ontime_shipments_bulk(
-    request_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Create multiple OnTime shipments in bulk."""
-    from ..adapters.carriers.ontime import OnTimeAdapter
-    adapter = OnTimeAdapter()
-    orders_data = request_data.get("shipments", [])
-    return await adapter.create_shipments_bulk(orders_data)
-
-
-@router.get("/ontime/shipments/{shipment_id}")
-async def get_ontime_shipment_status(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get OnTime shipment status."""
-    from ..adapters.carriers.ontime import OnTimeAdapter
-    adapter = OnTimeAdapter()
-    return await adapter.get_shipment_status(shipment_id)
-
-
-@router.get("/ontime/shipments/{shipment_id}/label")
-async def get_ontime_shipment_label(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get OnTime shipment label."""
-    from ..adapters.carriers.ontime import OnTimeAdapter
-    adapter = OnTimeAdapter()
-    label_bytes = await adapter.get_shipment_label(shipment_id)
-    return {"content": label_bytes.decode('utf-8')}
-
-
-# DHL endpoints
-@router.post("/dhl/shipments")
-async def create_dhl_shipment(
-    shipment_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Create a single DHL shipment."""
-    from ..adapters.carriers.dhl import DHLAdapter
-    adapter = DHLAdapter()
-    return await adapter.create_shipment(shipment_data)
-
-
-@router.post("/dhl/shipments/bulk")
-async def create_dhl_shipments_bulk(
-    request_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Create multiple DHL shipments in bulk."""
-    from ..adapters.carriers.dhl import DHLAdapter
-    adapter = DHLAdapter()
-    orders_data = request_data.get("shipments", [])
-    return await adapter.create_shipments_bulk(orders_data)
-
-
-@router.get("/dhl/shipments/{shipment_id}")
-async def get_dhl_shipment_status(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get DHL shipment status."""
-    from ..adapters.carriers.dhl import DHLAdapter
-    adapter = DHLAdapter()
-    return await adapter.get_shipment_status(shipment_id)
-
-
-@router.get("/dhl/shipments/{shipment_id}/label")
-async def get_dhl_shipment_label(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get DHL shipment label."""
-    from ..adapters.carriers.dhl import DHLAdapter
-    adapter = DHLAdapter()
-    label_bytes = await adapter.get_shipment_label(shipment_id)
-    return {"content": label_bytes.decode('utf-8')}
-
-
-# UPS endpoints
-@router.post("/ups/shipments")
-async def create_ups_shipment(
-    shipment_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Create a single UPS shipment."""
-    from ..adapters.carriers.ups import UPSAdapter
-    adapter = UPSAdapter()
-    return await adapter.create_shipment(shipment_data)
-
-
-@router.post("/ups/shipments/bulk")
-async def create_ups_shipments_bulk(
-    request_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Create multiple UPS shipments in bulk."""
-    from ..adapters.carriers.ups import UPSAdapter
-    adapter = UPSAdapter()
-    orders_data = request_data.get("shipments", [])
-    return await adapter.create_shipments_bulk(orders_data)
-
-
-@router.get("/ups/shipments/{shipment_id}")
-async def get_ups_shipment_status(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get UPS shipment status."""
-    from ..adapters.carriers.ups import UPSAdapter
-    adapter = UPSAdapter()
-    return await adapter.get_shipment_status(shipment_id)
-
-
-@router.get("/ups/shipments/{shipment_id}/label")
-async def get_ups_shipment_label(
-    shipment_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get UPS shipment label."""
-    from ..adapters.carriers.ups import UPSAdapter
-    adapter = UPSAdapter()
-    label_bytes = await adapter.get_shipment_label(shipment_id)
-    return {"content": label_bytes.decode('utf-8')}
+    Returns:
+        Health status for all carriers
+    """
+    health_status = {}
+    
+    for carrier_code, adapter in CARRIER_ADAPTERS.items():
+        health_status[carrier_code] = {
+            "name": adapter.carrier_name,
+            "status": "healthy" if adapter.is_mock_mode else "unknown",
+            "mode": "mock" if adapter.is_mock_mode else "real"
+        }
+    
+    return {
+        "carriers": health_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }
