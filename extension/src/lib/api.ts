@@ -16,7 +16,7 @@ import {
   ShipmentResult
 } from '@/types'
 
-class ApiClient {
+export class ApiClient {
   private client: AxiosInstance
   private baseURL: string
 

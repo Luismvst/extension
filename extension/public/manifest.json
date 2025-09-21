@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Mirakl-TIPSA Orchestrator",
+  "name": "Mirakl Tipsa MVP",
   "description": "Orchestrator for Mirakl marketplace orders to TIPSA carrier",
   "version": "0.2.0",
   "icons": {
@@ -11,7 +11,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Mirakl-TIPSA Orchestrator"
+    "default_title": "Mirakl Tipsa MVP"
   },
   "options_page": "options.html",
   "content_scripts": [
@@ -27,7 +27,8 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "downloads"
   ],
   "host_permissions": [
     "*://*.tipsa.com/*",

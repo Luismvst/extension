@@ -60,7 +60,7 @@ async def load_orders_and_create_shipments(
     
     try:
         # Step 1: Get orders from Mirakl
-        mirakl_result = await mirakl_adapter.get_orders(status="PENDING", limit=100, offset=0)
+        mirakl_result = await mirakl_adapter.get_orders(status="PENDING", limit=100, offset=0) # TODO adaptar esto
         orders = mirakl_result.get("orders", [])
         
         if not orders:

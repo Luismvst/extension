@@ -1,8 +1,4 @@
-/**
- * Options page application component.
- */
-
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -10,142 +6,177 @@ import {
   Typography,
   TextField,
   Button,
-  Switch,
-  FormControlLabel,
   Alert,
-  Grid
-} from '@mui/material'
-import { StorageManager } from '@/lib/storage'
+  Divider,
+  Grid,
+  Paper
+} from '@mui/material';
+import { Save as SaveIcon, Restore as RestoreIcon } from '@mui/icons-material';
+import { CsvExporter } from '@/lib/exportCsv';
 
-interface Settings {
-  apiBaseUrl: string
-  autoLoadOrders: boolean
-  autoCreateShipments: boolean
-  showNotifications: boolean
-}
-
-const OptionsApp: React.FC = () => {
-  const [settings, setSettings] = useState<Settings>({
-    apiBaseUrl: 'http://localhost:8080',
-    autoLoadOrders: false,
-    autoCreateShipments: false,
-    showNotifications: true
-  })
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export default function OptionsApp() {
+  const [config, setConfig] = useState({
+    producto: '48',
+    tipoBultos: 'PTR180P',
+    departamentoCliente: 'empresarial',
+    codigoCliente: '89'
+  });
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSettings()
-  }, [])
+    loadConfig();
+  }, []);
 
-  const loadSettings = async () => {
+  const loadConfig = async () => {
     try {
-      const storedSettings = await StorageManager.getSettings()
-      setSettings(prev => ({ ...prev, ...storedSettings }))
+      const savedConfig = await CsvExporter.loadConfig();
+      setConfig(savedConfig);
     } catch (err) {
-      console.error('Failed to load settings:', err)
+      console.error('Failed to load config:', err);
+      setError('Error al cargar configuración');
     }
-  }
+  };
 
   const handleSave = async () => {
     try {
-      await StorageManager.setSettings(settings)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      await CsvExporter.saveConfig(config);
+      setNotice('✅ Configuración guardada correctamente');
+      setError(null);
     } catch (err) {
-      setError('Failed to save settings')
+      setError('Error al guardar configuración');
     }
-  }
+  };
+
+  const handleReset = () => {
+    setConfig({
+      producto: '48',
+      tipoBultos: 'PTR180P',
+      departamentoCliente: 'empresarial',
+      codigoCliente: '89'
+    });
+    setNotice('Configuración restablecida a valores por defecto');
+  };
+
+  const handleChange = (field: keyof typeof config) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setConfig(prev => ({
+      ...prev,
+      [field]: event.target.value
+    }));
+  };
 
   return (
     <Box sx={{ maxWidth: 800, margin: '0 auto', p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Mirakl-TIPSA Orchestrator Settings
+      <Typography variant="h4" component="h1" gutterBottom>
+        Configuración CSV - Mirakl ↔ TIPSA
+      </Typography>
+      
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        Configura los valores por defecto para la exportación de CSV a TIPSA.
       </Typography>
 
-      {saved && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          Settings saved successfully!
+      {notice && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice(null)}>
+          {notice}
         </Alert>
       )}
-
+      
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                API Configuration
-              </Typography>
-              
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Valores por Defecto CSV
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="API Base URL"
-                value={settings.apiBaseUrl}
-                onChange={(e) => setSettings(prev => ({ ...prev, apiBaseUrl: e.target.value }))}
-                margin="normal"
-                helperText="Base URL for the orchestrator backend API"
+                label="Producto"
+                value={config.producto}
+                onChange={handleChange('producto')}
+                helperText="Código de producto por defecto"
+                variant="outlined"
               />
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Behavior Settings
-              </Typography>
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={settings.autoLoadOrders}
-                    onChange={(e) => setSettings(prev => ({ ...prev, autoLoadOrders: e.target.checked }))}
-                  />
-                }
-                label="Auto-load orders when opening TIPSA website"
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Tipo Bultos"
+                value={config.tipoBultos}
+                onChange={handleChange('tipoBultos')}
+                helperText="Tipo de bulto por defecto"
+                variant="outlined"
               />
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={settings.autoCreateShipments}
-                    onChange={(e) => setSettings(prev => ({ ...prev, autoCreateShipments: e.target.checked }))}
-                  />
-                }
-                label="Auto-create shipments after loading orders"
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Departamento Cliente"
+                value={config.departamentoCliente}
+                onChange={handleChange('departamentoCliente')}
+                helperText="Departamento del cliente"
+                variant="outlined"
               />
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={settings.showNotifications}
-                    onChange={(e) => setSettings(prev => ({ ...prev, showNotifications: e.target.checked }))}
-                  />
-                }
-                label="Show desktop notifications"
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Código Cliente"
+                value={config.codigoCliente}
+                onChange={handleChange('codigoCliente')}
+                helperText="Código del cliente"
+                variant="outlined"
               />
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+            </Grid>
+          </Grid>
 
-      <Box display="flex" justifyContent="flex-end" mt={4}>
-        <Button
-          variant="contained"
-          onClick={handleSave}
-        >
-          Save Settings
-        </Button>
-      </Box>
+          <Divider sx={{ my: 3 }} />
+
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              onClick={handleReset}
+              startIcon={<RestoreIcon />}
+            >
+              Restablecer
+            </Button>
+            
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              startIcon={<SaveIcon />}
+            >
+              Guardar Configuración
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Información sobre los Campos
+          </Typography>
+          
+          <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+            <Typography variant="body2" component="div">
+              <strong>Producto:</strong> Código de producto que se asignará a todos los envíos.<br/>
+              <strong>Tipo Bultos:</strong> Tipo de embalaje estándar para los envíos.<br/>
+              <strong>Departamento Cliente:</strong> Departamento interno del cliente.<br/>
+              <strong>Código Cliente:</strong> Código identificador del cliente en TIPSA.
+            </Typography>
+          </Paper>
+        </CardContent>
+      </Card>
     </Box>
-  )
+  );
 }
-
-export default OptionsApp

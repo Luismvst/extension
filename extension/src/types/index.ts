@@ -20,6 +20,13 @@ export interface Order {
   service_type?: string
   notes?: string
   metadata: Record<string, any>
+  // Additional fields for CSV export
+  payment_method?: string
+  shipping_method?: string
+  packages_count?: number
+  volume?: string
+  tax_id?: string
+  syncedToMirakl?: boolean
 }
 
 export interface Address {

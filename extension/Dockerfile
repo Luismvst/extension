@@ -11,8 +11,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the extension
-RUN npm run build
+    # Build the extension (with forced clean)
+    RUN rm -rf dist .vite .cache && npm install && npm run build
 
 # Ensure dist directory exists and copy files
 RUN mkdir -p /app/dist && \

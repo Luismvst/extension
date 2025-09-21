@@ -5,6 +5,10 @@
  * the orchestrator overlay with buttons to load orders and create shipments.
  */
 
+// CONTENT SENTINEL for build verification
+declare const BUILD_INFO: { commit: string; buildTime: string; buildNumber: string }
+console.log('CONTENT SENTINEL', BUILD_INFO.commit)
+
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'

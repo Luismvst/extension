@@ -1,0 +1,26 @@
+﻿{
+    "version":  "0.2.20250921124005",
+    "manifest_version":  3,
+    "action":  {
+                   "default_title":  "Mirakl Tipsa MVP",
+                   "default_popup":  "popup.html"
+               },
+    "name":  "Mirakl Tipsa MVP",
+    "permissions":  [
+                        "storage",
+                        "activeTab",
+                        "scripting",
+                        "tabs",
+                        "contextMenus"
+                    ],
+    "description":  "Chrome extension for orchestrating Mirakl marketplace orders to TIPSA carrier - MVP Version",
+    "background":  {
+                       "type":  "module",
+                       "service_worker":  "background.js"
+                   },
+    "host_permissions":  [
+                             "*://*.tipsa.com/*",
+                             "*://*.tip-sa.com/*",
+                             "http://localhost:8080/*"
+                         ]
+}

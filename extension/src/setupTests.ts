@@ -1,87 +1,72 @@
 import '@testing-library/jest-dom'
+import { vi } from 'vitest'
 
-// Mock chrome APIs
+// Mock Chrome APIs
 const mockChrome = {
   runtime: {
-    sendMessage: jest.fn(),
-    onMessage: {
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-    },
     onInstalled: {
-      addListener: jest.fn(),
+      addListener: vi.fn()
+    },
+    onMessage: {
+      addListener: vi.fn()
     },
     onStartup: {
-      addListener: jest.fn(),
+      addListener: vi.fn()
     },
     onSuspend: {
-      addListener: jest.fn(),
+      addListener: vi.fn()
     },
+    getManifest: vi.fn(() => ({
+      version: '0.2.0',
+      name: 'Mirakl Tipsa MVP'
+    })),
+    openOptionsPage: vi.fn(),
+    sendMessage: vi.fn()
+  },
+  tabs: {
+    onUpdated: {
+      addListener: vi.fn()
+    },
+    sendMessage: vi.fn(),
+    query: vi.fn()
+  },
+  scripting: {
+    executeScript: vi.fn()
+  },
+  action: {
+    onClicked: {
+      addListener: vi.fn()
+    },
+    openPopup: vi.fn()
+  },
+  contextMenus: {
+    create: vi.fn(),
+    onClicked: {
+      addListener: vi.fn()
+    }
   },
   storage: {
     local: {
-      get: jest.fn(),
-      set: jest.fn(),
-      remove: jest.fn(),
-      clear: jest.fn(),
-      getBytesInUse: jest.fn(),
-      QUOTA_BYTES: 5242880,
-    },
-  },
-  tabs: {
-    sendMessage: jest.fn(),
-  },
-  alarms: {
-    create: jest.fn(),
-    onAlarm: {
-      addListener: jest.fn(),
-    },
-  },
+      get: vi.fn(),
+      set: vi.fn(),
+      remove: vi.fn(),
+      clear: vi.fn()
+    }
+  }
 }
 
-Object.assign(global, { chrome: mockChrome })
-
-// Mock fetch
-global.fetch = jest.fn()
-
-// Mock URL.createObjectURL and URL.revokeObjectURL
-Object.defineProperty(URL, 'createObjectURL', {
-  writable: true,
-  value: jest.fn(() => 'mock-url'),
+// Set up global Chrome mock
+Object.defineProperty(global, 'chrome', {
+  value: mockChrome,
+  writable: true
 })
 
-Object.defineProperty(URL, 'revokeObjectURL', {
-  writable: true,
-  value: jest.fn(),
-})
-
-// Mock document.createElement for download functionality
-const mockClick = jest.fn()
-const mockAppendChild = jest.fn()
-const mockRemoveChild = jest.fn()
-
-Object.defineProperty(document, 'createElement', {
-  writable: true,
-  value: jest.fn((tagName: string) => {
-    if (tagName === 'a') {
-      return {
-        href: '',
-        download: '',
-        style: { visibility: '' },
-        click: mockClick,
-        setAttribute: jest.fn(),
-      }
-    }
-    return {}
-  }),
-})
-
-Object.defineProperty(document.body, 'appendChild', {
-  writable: true,
-  value: mockAppendChild,
-})
-
-Object.defineProperty(document.body, 'removeChild', {
-  writable: true,
-  value: mockRemoveChild,
+// Mock BUILD_INFO
+Object.defineProperty(global, 'BUILD_INFO', {
+  value: {
+    commit: 'test-commit',
+    buildTime: '2024-01-01T00:00:00.000Z',
+    buildNumber: '1234567890'
+  },
+  writable: true
 })

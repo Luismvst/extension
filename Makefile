@@ -13,6 +13,7 @@ help:
 	@echo "  make clean            - Limpiar contenedores e imágenes"
 	@echo "  make test             - Ejecutar tests"
 	@echo "  make test-e2e         - Ejecutar tests E2E con Playwright"
+	@echo "  make verify-logs      - Verificar logs CSV del backend"
 	@echo "  make install-extension - Instalar dependencias de la extensión"
 	@echo "  make build-extension  - Construir la extensión"
 	@echo "  make backend-only     - Solo backend"
@@ -143,6 +144,12 @@ test-e2e:
 	docker-compose down
 	@echo "✅ Tests E2E completados"
 
+# Verificar logs CSV
+verify-logs:
+	@echo "🔍 Verificando logs CSV..."
+	python scripts/verify-logs.py
+	@echo "✅ Verificación de logs completada"
+
 # Pipeline CI completo
 ci:
 	@echo "🔄 Ejecutando pipeline CI completo..."
@@ -151,8 +158,10 @@ ci:
 	@echo "2. Levantando servicios..."
 	docker-compose up -d
 	@sleep 30
-	@echo "3. Ejecutando tests E2E..."
+	@echo "3. Verificando logs CSV..."
+	python scripts/verify-logs.py
+	@echo "4. Ejecutando tests E2E..."
 	cd tests && npm install && npx playwright install && npx playwright test
-	@echo "4. Parando servicios..."
+	@echo "5. Parando servicios..."
 	docker-compose down
 	@echo "✅ Pipeline CI completado"

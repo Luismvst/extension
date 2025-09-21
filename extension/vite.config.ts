@@ -1,10 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { execSync } from 'child_process'
+
+// Get build info
+const EXT_BUILD_SHA = process.env.EXT_BUILD_SHA || 'docker-build'
+const EXT_BUILD_TIME = process.env.EXT_BUILD_TIME || new Date().toISOString()
+const EXT_VERSION = process.env.EXT_VERSION || Date.now().toString()
+
+const BUILD_INFO = {
+  commit: EXT_BUILD_SHA,
+  buildTime: EXT_BUILD_TIME,
+  buildNumber: EXT_VERSION
+}
 
 export default defineConfig({
   plugins: [react()],
   base: './',
+  define: {
+    'BUILD_INFO': JSON.stringify(BUILD_INFO)
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -27,7 +42,7 @@ export default defineConfig({
             return 'content/index.js'
           }
           if (chunkInfo.name === 'background') {
-            return 'background/index.js'
+            return 'background.js' // Service worker must be in root
           }
           return '[name].js'
         },

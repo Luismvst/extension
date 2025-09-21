@@ -1,0 +1,24 @@
+# Multi-stage Dockerfile for Chrome Extension MV3
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY extension/package*.json ./
+RUN npm ci --frozen-lockfile
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY extension/package*.json ./
+RUN npm ci --frozen-lockfile
+COPY extension/ .
+RUN npm run clean
+RUN npm run typecheck
+RUN npm run lint
+RUN npm run test:unit
+RUN npm run build
+
+FROM node:20-alpine AS artifact
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/package.json ./
+RUN npm ci --frozen-lockfile
+RUN npm run package:zip
+CMD ["sh", "-c", "ls -la /app/out/"]

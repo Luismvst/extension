@@ -4,11 +4,20 @@
   "description": "Chrome extension for orchestrating Mirakl orders to TIPSA carrier",
   "type": "module",
   "scripts": {
+    "clean": "rimraf dist .vite .turbo coverage artifacts out",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "test:unit": "vitest run --coverage",
+    "test:unit:watch": "vitest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "build": "vite build",
     "dev": "vite",
-    "build": "tsc && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0"
+    "package:zip": "node scripts/zip-dist.mjs",
+    "verify:sentinels": "node scripts/verify-sentinels.mjs",
+    "prebuild": "npm run clean"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -33,6 +42,22 @@
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5"
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.1.0",
+    "rimraf": "^5.0.0",
+    "cross-env": "^7.0.3",
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "@testing-library/react": "^14.1.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/user-event": "^14.5.0",
+    "jsdom": "^23.0.0",
+    "playwright": "^1.40.0",
+    "@playwright/test": "^1.40.0",
+    "sinon-chrome": "^3.0.1",
+    "archiver": "^6.0.0",
+    "crypto": "^1.0.1"
   }
 }

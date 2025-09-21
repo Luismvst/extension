@@ -5,10 +5,12 @@
  * and manages the extension's lifecycle.
  */
 
-import { ExtensionMessage, ExtensionResponse } from '@/types'
-
 // Initialize the background script
-console.log('Mirakl-TIPSA Orchestrator background script loaded')
+console.log('Mirakl Tipsa MVP background script loaded')
+
+// BG SENTINEL for build verification
+declare const BUILD_INFO: { commit: string; buildTime: string; buildNumber: string }
+console.log('BG SENTINEL', BUILD_INFO.commit, BUILD_INFO.buildTime, 'v' + chrome.runtime.getManifest().version)
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
@@ -22,9 +24,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((
-  message: ExtensionMessage,
+  message: any,
   sender: chrome.runtime.MessageSender,
-  sendResponse: (response: ExtensionResponse) => void
+  sendResponse: (response: any) => void
 ) => {
   console.log('Background received message:', message)
 
@@ -56,7 +58,7 @@ chrome.runtime.onMessage.addListener((
 })
 
 // Handle fetch orders request
-async function handleFetchOrders(payload: any, sendResponse: (response: ExtensionResponse) => void) {
+async function handleFetchOrders(payload: any, sendResponse: (response: any) => void) {
   try {
     // This would typically make an API call to the backend
     // For now, we'll just return a mock response
@@ -93,7 +95,7 @@ async function handleFetchOrders(payload: any, sendResponse: (response: Extensio
 }
 
 // Handle create shipments request
-async function handleCreateShipments(payload: any, sendResponse: (response: ExtensionResponse) => void) {
+async function handleCreateShipments(payload: any, sendResponse: (response: any) => void) {
   try {
     // This would typically make an API call to create shipments
     // For now, we'll just return a mock response
@@ -128,7 +130,7 @@ async function handleCreateShipments(payload: any, sendResponse: (response: Exte
 }
 
 // Handle upload tracking request
-async function handleUploadTracking(payload: any, sendResponse: (response: ExtensionResponse) => void) {
+async function handleUploadTracking(payload: any, sendResponse: (response: any) => void) {
   try {
     // This would typically make an API call to upload tracking
     // For now, we'll just return a success response
@@ -146,7 +148,7 @@ async function handleUploadTracking(payload: any, sendResponse: (response: Exten
 }
 
 // Handle get logs request
-async function handleGetLogs(sendResponse: (response: ExtensionResponse) => void) {
+async function handleGetLogs(sendResponse: (response: any) => void) {
   try {
     // This would typically fetch logs from the backend
     // For now, we'll return empty logs
@@ -197,7 +199,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'inject-orchestrator',
-    title: 'Inject Mirakl-TIPSA Orchestrator',
+    title: 'Inject Mirakl Tipsa MVP',
     contexts: ['page']
   })
 })
