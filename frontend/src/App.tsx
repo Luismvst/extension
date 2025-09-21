@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import {
   AppBar,
@@ -13,7 +13,6 @@ import {
   ListItemText,
   Toolbar,
   Typography,
-  Avatar,
   Menu,
   MenuItem,
   Divider,
@@ -23,7 +22,6 @@ import {
   Dashboard as DashboardIcon,
   Settings as SettingsIcon,
   Payment as PaymentIcon,
-  Integration as IntegrationIcon,
   AccountCircle as AccountCircleIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material'
@@ -40,11 +38,11 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Configuración', icon: <SettingsIcon />, path: '/configuration' },
   { text: 'Método de pago', icon: <PaymentIcon />, path: '/payment' },
-  { text: 'Integraciones', icon: <IntegrationIcon />, path: '/integrations' },
+  { text: 'Integraciones', icon: <SettingsIcon />, path: '/integrations' },
 ]
 
 function App() {
-  const { user, logout, isAuthenticated } = useAuth()
+  const { logout, isAuthenticated } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
 

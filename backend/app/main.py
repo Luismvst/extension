@@ -62,7 +62,11 @@ app.add_middleware(
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle validation errors with detailed logging."""
     logger.error(f"Validation error on {request.method} {request.url}: {exc.errors()}")
-    logger.error(f"Request body: {await request.body()}")
+    try:
+        body = await request.body()
+        logger.error(f"Request body: {body}")
+    except Exception as e:
+        logger.error(f"Could not read request body: {e}")
     return JSONResponse(
         status_code=422,
         content={"detail": "Validation error", "errors": exc.errors()}

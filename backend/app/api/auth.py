@@ -50,7 +50,7 @@ async def login(request: LoginRequest):
     """
     Authenticate user and return JWT token.
     
-    This endpoint authenticates a user with username and password,
+    This endpoint authenticates a user with email and password,
     returning a JWT token for subsequent API calls.
     """
     logger.info(f"Login attempt for user: {request.email}")
