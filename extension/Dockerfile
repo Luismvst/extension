@@ -11,8 +11,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-    # Build the extension (with forced clean)
-    RUN rm -rf dist .vite .cache && npm install && npm run build
+# Build the extension (without cleaning dist since it's mounted)
+RUN npm run build
 
 # Ensure dist directory exists and copy files
 RUN mkdir -p /app/dist && \
@@ -43,5 +43,5 @@ RUN echo "=== DIST ROOT ===" && \
     echo "=== DIST BACKGROUND ===" && \
     ls -la /app/dist/background/ || true
 
-# Default command
-CMD ["npm", "run", "build"]
+# Default command - just keep container running
+CMD ["tail", "-f", "/dev/null"]

@@ -68,15 +68,35 @@ const Dashboard: React.FC = () => {
       if (filters.state) params.append('state', filters.state)
       if (filters.carrier) params.append('carrier', filters.carrier)
       
-      const response = await fetch(`/api/v1/logs/orders-view?${params}`, {
+      const response = await fetch(`http://localhost:8080/api/v1/logs/orders-view?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       })
       
       if (response.ok) {
         const data = await response.json()
-        setOrders(data.orders || [])
+        // Map backend data to frontend interface
+        const mappedOrders = (data.orders || []).map((order: any) => ({
+          mirakl_order_id: order.order_id || order['ï»¿order_id'],
+          mirakl_status: order.internal_state || 'UNKNOWN',
+          mirakl_customer_name: order.buyer_name || order.consignee_name || 'N/A',
+          mirakl_customer_email: order.buyer_email || order.destination_email || 'N/A',
+          mirakl_weight: parseFloat(order.weight_kg) || 0,
+          mirakl_total_amount: parseFloat(order.total_amount) || 0,
+          mirakl_currency: order.currency || 'EUR',
+          carrier_code: order.carrier_code || 'N/A',
+          carrier_name: order.carrier_name || 'N/A',
+          expedition_id: order.expedition_id || 'N/A',
+          tracking_number: order.tracking_number || 'N/A',
+          carrier_status: order.internal_state || 'UNKNOWN',
+          internal_state: order.internal_state || 'UNKNOWN',
+          last_event: order.internal_state || 'UNKNOWN',
+          last_event_at: order.updated_at || order.created_at || new Date().toISOString(),
+          updated_at: order.updated_at || order.created_at || new Date().toISOString(),
+        }))
+        setOrders(mappedOrders)
       }
     } catch (error) {
       console.error('Error fetching orders:', error)
@@ -86,41 +106,43 @@ const Dashboard: React.FC = () => {
   }
 
   const fetchStats = async () => {
-    try {
-      const response = await fetch('/api/v1/logs/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data.stats.orders)
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-    }
+    // Stats endpoint not implemented yet
+    // For now, calculate stats from orders
+    const totalOrders = orders.length
+    const byState: Record<string, number> = {}
+    const byCarrier: Record<string, number> = {}
+    
+    orders.forEach(order => {
+      byState[order.internal_state] = (byState[order.internal_state] || 0) + 1
+      byCarrier[order.carrier_code] = (byCarrier[order.carrier_code] || 0) + 1
+    })
+    
+    setStats({
+      totalOrders,
+      byState,
+      byCarrier,
+    })
   }
 
   const exportCSV = async () => {
     try {
-      const response = await fetch('/api/v1/logs/exports/orders-view.csv', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
+      // Simple CSV export from current orders
+      const csvContent = [
+        'Order ID,Customer Name,Status,Carrier,Tracking Number',
+        ...orders.map(order => 
+          `${order.mirakl_order_id},${order.mirakl_customer_name},${order.internal_state},${order.carrier_name},${order.tracking_number}`
+        ).join('\n')
+      ].join('\n')
       
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `orders_view_${new Date().toISOString().split('T')[0]}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      }
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `orders_view_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
     } catch (error) {
       console.error('Error exporting CSV:', error)
     }
@@ -259,7 +281,7 @@ const Dashboard: React.FC = () => {
                 <InputLabel>Estado</InputLabel>
                 <Select
                   value={filters.state}
-                  onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+                  onChange={(e: any) => setFilters({ ...filters, state: e.target.value })}
                   label="Estado"
                 >
                   <MenuItem value="">Todos</MenuItem>
@@ -276,7 +298,7 @@ const Dashboard: React.FC = () => {
                 <InputLabel>Transportista</InputLabel>
                 <Select
                   value={filters.carrier}
-                  onChange={(e) => setFilters({ ...filters, carrier: e.target.value })}
+                  onChange={(e: any) => setFilters({ ...filters, carrier: e.target.value })}
                   label="Transportista"
                 >
                   <MenuItem value="">Todos</MenuItem>
@@ -313,7 +335,7 @@ const Dashboard: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {orders.map((order) => (
+                {orders.map((order: any) => (
                   <TableRow key={order.mirakl_order_id}>
                     <TableCell>{order.mirakl_order_id}</TableCell>
                     <TableCell>

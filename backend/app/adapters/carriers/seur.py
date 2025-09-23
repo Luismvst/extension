@@ -15,7 +15,10 @@ from datetime import datetime, timedelta
 
 from ..interfaces.carrier import CarrierAdapter
 from ...core.settings import settings
-from ...core.logging import csv_logger, json_dumper
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class SeurAdapter(CarrierAdapter):
@@ -85,13 +88,7 @@ class SeurAdapter(CarrierAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="create_shipment",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Created SEUR shipment {shipment_id}",
-            duration_ms=200
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
     
@@ -131,12 +128,7 @@ class SeurAdapter(CarrierAdapter):
             shipment = await self._create_shipment_mock(order)
             shipments.append(shipment)
         
-        csv_logger.log_operation(
-            operation="create_shipments_bulk",
-            order_id="",
-            status="SUCCESS",
-            details=f"Created {len(shipments)} SEUR shipments",
-            duration_ms=len(orders) * 200
+        logger.info(f"Created {len(shipments)} SEUR shipments", duration_ms=len(orders) * 200
         )
         
         return {
@@ -197,11 +189,9 @@ class SeurAdapter(CarrierAdapter):
         
         # Check if we already processed this request
         if idempotency_key in self._idempotency_keys:
-            csv_logger.log_operation(
-                operation="create_shipment_idempotent",
-                order_id=order_data.get("order_id"),
-                status="SUCCESS",
-                details=f"Idempotent request, returning cached result for key {idempotency_key}"
+            logger.info(
+                f"Idempotent request, returning cached result for key {idempotency_key}",
+                status="SUCCESS"
             )
             return await self._get_cached_shipment(idempotency_key)
         
@@ -245,12 +235,7 @@ class SeurAdapter(CarrierAdapter):
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        csv_logger.log_operation(
-            operation="get_shipment_status",
-            order_id=expedition_id,
-            status="SUCCESS",
-            details=f"SEUR status: {status}"
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
     
@@ -278,12 +263,7 @@ class SeurAdapter(CarrierAdapter):
         event_type = event_data.get("event_type")
         expedition_id = event_data.get("expedition_id")
         
-        csv_logger.log_operation(
-            operation="process_webhook_event",
-            order_id=expedition_id,
-            status="SUCCESS",
-            details=f"Processed SEUR {event_type} event for {expedition_id}"
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return {
             "expedition_id": expedition_id,
@@ -294,3 +274,86 @@ class SeurAdapter(CarrierAdapter):
             "timestamp": event_data.get("timestamp"),
             "processed_at": datetime.utcnow().isoformat()
         }
+
+    async def get_shipment_label(self, shipment_id: str) -> bytes:
+        """Get shipment label as PDF bytes."""
+        if self.mock_mode:
+            return await self._get_shipment_label_mock(shipment_id)
+        
+        return await self._get_shipment_label_real(shipment_id)
+    
+    async def _get_shipment_label_mock(self, shipment_id: str) -> bytes:
+        """Mock implementation of get_shipment_label."""
+        # Return a mock PDF label
+        return b"Mock PDF label content"
+    
+    async def _get_shipment_label_real(self, shipment_id: str) -> bytes:
+        """Real implementation of get_shipment_label."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/pdf"
+        }
+        
+        url = self.endpoints["label"].format(shipment_id=shipment_id)
+        
+        timeout = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                return response.content
+        except httpx.TimeoutException as e:
+            self.logger.error(f"Timeout getting label from SEUR: {e}", exc_info=True)
+            raise Exception(f"Request timeout: {e}")
+        except httpx.HTTPError as e:
+            self.logger.error(f"HTTP error getting label from SEUR: {e}", exc_info=True)
+            raise Exception(f"HTTP error: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error getting label from SEUR: {e}", exc_info=True)
+            raise Exception(f"Request failed: {e}")
+    
+    async def cancel_shipment(self, shipment_id: str, reason: str = None) -> Dict[str, Any]:
+        """Cancel a shipment."""
+        if self.mock_mode:
+            return await self._cancel_shipment_mock(shipment_id, reason)
+        
+        return await self._cancel_shipment_real(shipment_id, reason)
+    
+    async def _cancel_shipment_mock(self, shipment_id: str, reason: str = None) -> Dict[str, Any]:
+        """Mock implementation of cancel_shipment."""
+        return {
+            "shipment_id": shipment_id,
+            "status": "cancelled",
+            "reason": reason or "User requested cancellation",
+            "cancelled_at": datetime.now().isoformat(),
+            "success": True
+        }
+    
+    async def _cancel_shipment_real(self, shipment_id: str, reason: str = None) -> Dict[str, Any]:
+        """Real implementation of cancel_shipment."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "reason": reason or "User requested cancellation"
+        }
+        
+        url = self.endpoints["cancel"].format(shipment_id=shipment_id)
+        
+        timeout = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(url, headers=headers, json=data)
+                response.raise_for_status()
+                return response.json()
+        except httpx.TimeoutException as e:
+            self.logger.error(f"Timeout cancelling shipment in SEUR: {e}", exc_info=True)
+            raise Exception(f"Request timeout: {e}")
+        except httpx.HTTPError as e:
+            self.logger.error(f"HTTP error cancelling shipment in SEUR: {e}", exc_info=True)
+            raise Exception(f"HTTP error: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error cancelling shipment in SEUR: {e}", exc_info=True)
+            raise Exception(f"Request failed: {e}")

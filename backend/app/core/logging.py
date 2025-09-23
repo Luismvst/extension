@@ -119,7 +119,10 @@ def setup_logging():
     
     return logger
 
+def get_logger(name: str):
+    """Get a logger instance."""
+    return logging.getLogger(name)
 
 # Global instances
-csv_logger = CSVLogger(settings.csv_log_file)
+# csv_logger = CSVLogger(settings.csv_log_file)  # Disabled - using csv_ops_logger instead
 json_dumper = JSONDumper(settings.json_dumps_dir)

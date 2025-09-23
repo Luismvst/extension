@@ -1,7 +1,7 @@
 import { defineManifest } from '@crxjs/vite-plugin'
 
 const EXT_VERSION = process.env.EXT_VERSION || Date.now().toString()
-const VERSION = `0.2.${EXT_VERSION}`
+const VERSION = `0.3.${EXT_VERSION}`
 
 export default defineManifest({
   name: 'Mirakl Tipsa MVP',

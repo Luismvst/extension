@@ -11,7 +11,10 @@ import time
 
 from ..adapters.marketplaces.mirakl import MiraklAdapter
 from ..core.auth import get_current_user
-from ..core.logging import csv_logger, json_dumper
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/v1/marketplaces", tags=["marketplaces"])
@@ -47,25 +50,13 @@ async def get_mirakl_orders(
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="get_mirakl_orders",
-            order_id="",
-            status="SUCCESS",
-            details=f"Retrieved {len(result.get('orders', []))} orders",
-            duration_ms=duration_ms
-        )
+        logger.info(f"get_mirakl_orders: Retrieved {len(result.get('orders', []))} orders")
         
         return result
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="get_mirakl_orders",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"get_mirakl_orders: Error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -92,25 +83,13 @@ async def get_mirakl_order_details(
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="get_mirakl_order_details",
-            order_id=order_id,
-            status="SUCCESS",
-            details="Retrieved order details",
-            duration_ms=duration_ms
-        )
+        logger.info(f"get_mirakl_order_details: Retrieved order {order_id}")
         
         return result
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="get_mirakl_order_details",
-            order_id=order_id,
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"get_mirakl_orders: Error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -152,21 +131,15 @@ async def update_mirakl_order_tracking(
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="update_mirakl_order_tracking",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Updated tracking: {tracking_number}",
-            duration_ms=duration_ms
-        )
+        logger.info(f"get_mirakl_order_details: Retrieved order {order_id}")
         
-        # Dump request/response
-        json_dumper.dump_request_response(
-            operation="update_mirakl_order_tracking",
-            order_id=order_id,
-            request_data=tracking_data,
-            response_data=result
-        )
+        # Dump request/response (disabled)
+        # json_dumper.dump_request_response(
+        #     operation="update_mirakl_order_tracking",
+        #     order_id=order_id,
+        #     request_data=tracking_data,
+        #     response_data=result
+        # )
         
         return result
         
@@ -174,13 +147,7 @@ async def update_mirakl_order_tracking(
         raise
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="update_mirakl_order_tracking",
-            order_id=order_id,
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"get_mirakl_orders: Error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -219,21 +186,15 @@ async def update_mirakl_order_status(
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="update_mirakl_order_status",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Updated status to {status}",
-            duration_ms=duration_ms
-        )
+        logger.info(f"get_mirakl_order_details: Retrieved order {order_id}")
         
-        # Dump request/response
-        json_dumper.dump_request_response(
-            operation="update_mirakl_order_status",
-            order_id=order_id,
-            request_data=status_data,
-            response_data=result
-        )
+        # Dump request/response (disabled)
+        # json_dumper.dump_request_response(
+        #     operation="update_mirakl_order_status",
+        #     order_id=order_id,
+        #     request_data=status_data,
+        #     response_data=result
+        # )
         
         return result
         
@@ -241,11 +202,5 @@ async def update_mirakl_order_status(
         raise
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="update_mirakl_order_status",
-            order_id=order_id,
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"get_mirakl_orders: Error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

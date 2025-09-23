@@ -1,3 +1,7 @@
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 """
 Pytest configuration and fixtures.
 """

@@ -13,7 +13,10 @@ from datetime import datetime, timedelta
 
 from ..interfaces.carrier import CarrierAdapter
 from ...core.settings import settings
-from ...core.logging import csv_logger, json_dumper
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class TipsaAdapter(CarrierAdapter):
@@ -81,13 +84,7 @@ class TipsaAdapter(CarrierAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="create_shipment",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Created shipment {shipment_id}",
-            duration_ms=100
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
     
@@ -101,14 +98,25 @@ class TipsaAdapter(CarrierAdapter):
         # Transform order data to TIPSA format
         shipment_data = self._transform_order_to_shipment(order_data)
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.endpoints["shipments"],
-                headers=headers,
-                json=shipment_data
-            )
-            response.raise_for_status()
-            return response.json()
+        timeout = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    self.endpoints["shipments"],
+                    headers=headers,
+                    json=shipment_data
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.TimeoutException as e:
+            self.logger.error(f"Timeout creating shipment in TIPSA: {e}", exc_info=True)
+            raise Exception(f"Request timeout: {e}")
+        except httpx.HTTPError as e:
+            self.logger.error(f"HTTP error creating shipment in TIPSA: {e}", exc_info=True)
+            raise Exception(f"HTTP error: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error creating shipment in TIPSA: {e}", exc_info=True)
+            raise Exception(f"Request failed: {e}")
     
     async def create_shipments_bulk(self, orders_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Create multiple shipments in bulk."""
@@ -157,13 +165,7 @@ class TipsaAdapter(CarrierAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="create_shipments_bulk",
-            order_id="",
-            status="SUCCESS",
-            details=f"Created {len(shipments)} shipments",
-            duration_ms=200
-        )
+        logger.info(f"Created shipment for order {order_id}, duration_ms={200}")
         
         return result
     
@@ -211,13 +213,7 @@ class TipsaAdapter(CarrierAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="get_shipment_status",
-            order_id=shipment_id,
-            status="SUCCESS",
-            details=f"Retrieved status: {result['status']}",
-            duration_ms=50
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
     
@@ -253,13 +249,7 @@ class TipsaAdapter(CarrierAdapter):
         """.encode('utf-8')
         
         # Log operation
-        csv_logger.log_operation(
-            operation="get_shipment_label",
-            order_id=shipment_id,
-            status="SUCCESS",
-            details="Generated mock label",
-            duration_ms=30
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return mock_pdf_content
     
@@ -298,13 +288,7 @@ class TipsaAdapter(CarrierAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="cancel_shipment",
-            order_id=shipment_id,
-            status="SUCCESS",
-            details=f"Cancelled: {reason or 'No reason provided'}",
-            duration_ms=40
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
     
@@ -364,11 +348,9 @@ class TipsaAdapter(CarrierAdapter):
         
         # Check if we already processed this request
         if idempotency_key in self._idempotency_keys:
-            csv_logger.log_operation(
-                operation="create_shipment_idempotent",
-                order_id=order_data.get("order_id"),
-                status="SUCCESS",
-                details=f"Idempotent request, returning cached result for key {idempotency_key}"
+            logger.info(
+                f"Idempotent request, returning cached result for key {idempotency_key}",
+                status="SUCCESS"
             )
             # Return cached result (in real implementation, this would be from database)
             return await self._get_cached_shipment(idempotency_key)
@@ -424,12 +406,7 @@ class TipsaAdapter(CarrierAdapter):
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        csv_logger.log_operation(
-            operation="get_shipment_status",
-            order_id=expedition_id,
-            status="SUCCESS",
-            details=f"Status: {status}"
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
     
@@ -475,12 +452,7 @@ class TipsaAdapter(CarrierAdapter):
         event_type = event_data.get("event_type")
         expedition_id = event_data.get("expedition_id")
         
-        csv_logger.log_operation(
-            operation="process_webhook_event",
-            order_id=expedition_id,
-            status="SUCCESS",
-            details=f"Processed {event_type} event for {expedition_id}"
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return {
             "expedition_id": expedition_id,

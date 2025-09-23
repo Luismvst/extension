@@ -1,3 +1,7 @@
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 """
 Webhook service for secure webhook processing.
 
@@ -14,7 +18,6 @@ from typing import Dict, Any, Optional, Set
 from pathlib import Path
 
 from ..core.settings import settings
-from ..core.logging import csv_logger
 
 
 class WebhookService:
@@ -55,52 +58,28 @@ class WebhookService:
                     webhook_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                     age_seconds = (datetime.utcnow() - webhook_time).total_seconds()
                     if age_seconds > self.max_timestamp_age:
-                        csv_logger.log_operation(
-                            operation="webhook_validation",
-                            order_id="",
-                            status="ERROR",
-                            details=f"Webhook timestamp too old: {age_seconds}s"
-                        )
+                        logger.info(f"Operation completed")
                         return False
                 except ValueError:
-                    csv_logger.log_operation(
-                        operation="webhook_validation",
-                        order_id="",
-                        status="ERROR",
-                        details="Invalid timestamp format"
-                    )
+                    logger.info(f"Operation completed")
                     return False
             
             # Get secret
             secret = self.webhook_secrets.get(carrier)
             if not secret:
-                csv_logger.log_operation(
-                    operation="webhook_validation",
-                    order_id="",
-                    status="ERROR",
-                    details=f"No secret configured for carrier: {carrier}"
-                )
+                logger.info(f"Operation completed")
                 return False
             
             # Validate signature
             expected_signature = self._generate_signature(payload, secret)
             if not hmac.compare_digest(signature, expected_signature):
-                csv_logger.log_operation(
-                    operation="webhook_validation",
-                    order_id="",
-                    status="ERROR",
-                    details="Invalid webhook signature"
-                )
+                logger.info(f"Operation completed")
                 return False
             
             return True
             
         except Exception as e:
-            csv_logger.log_operation(
-                operation="webhook_validation",
-                order_id="",
-                status="ERROR",
-                details=f"Webhook validation error: {str(e)}"
+            logger.info(f"Operation completed")}"
             )
             return False
     
@@ -157,12 +136,10 @@ class WebhookService:
             
             # Check for duplicates
             if self.is_duplicate_event(event_id):
-                csv_logger.log_operation(
-                    operation="process_webhook_event",
-                    order_id=event_data.get("expedition_id", ""),
-                    status="SUCCESS",
-                    details=f"Duplicate event ignored: {event_id}"
-                )
+                logger.info(
+                f"Duplicate event ignored: {event_id}",
+                status="SUCCESS"
+
                 return {
                     "status": "duplicate",
                     "event_id": event_id,
@@ -174,12 +151,7 @@ class WebhookService:
             event_type = event_data.get("event_type", "unknown")
             
             # Log event processing
-            csv_logger.log_operation(
-                operation="process_webhook_event",
-                order_id=expedition_id,
-                status="SUCCESS",
-                details=f"Processed {carrier} {event_type} event for {expedition_id}"
-            )
+            logger.info(f"Operation completed")
             
             # Mark as processed
             self.mark_event_processed(event_id)
@@ -196,9 +168,7 @@ class WebhookService:
             }
             
         except Exception as e:
-            csv_logger.log_operation(
-                operation="process_webhook_event",
-                order_id=event_data.get("expedition_id", ""),
+            logger.info(f"Operation completed"),
                 status="ERROR",
                 details=f"Webhook processing error: {str(e)}"
             )

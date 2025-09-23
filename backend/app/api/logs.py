@@ -14,9 +14,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..core.auth import get_current_user
-from ..core.logging import csv_logger, json_dumper
-from ..core.unified_logger import unified_logger
+from ..utils.csv_ops_logger import csv_ops_logger
+from ..core.unified_order_logger import unified_order_logger
 from ..core.settings import settings
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/v1/logs", tags=["logs"])
@@ -26,7 +30,8 @@ router = APIRouter(prefix="/api/v1/logs", tags=["logs"])
 async def get_operations_logs(
     limit: int = 100,
     offset: int = 0,
-    operation: str = None,
+    scope: str = None,
+    action: str = None,
     status: str = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
@@ -36,7 +41,8 @@ async def get_operations_logs(
     Args:
         limit: Maximum number of logs to return
         offset: Number of logs to skip
-        operation: Filter by operation type
+        scope: Filter by scope (e.g., 'mirakl', 'carrier', 'orchestrator')
+        action: Filter by action type
         status: Filter by status
         current_user: Authenticated user
         
@@ -44,38 +50,21 @@ async def get_operations_logs(
         Operations logs with filtering and pagination
     """
     try:
-        # Read CSV file
-        csv_file = settings.csv_log_file
-        if not os.path.exists(csv_file):
-            return {
-                "success": True,
-                "logs": [],
-                "total": 0,
-                "limit": limit,
-                "offset": offset,
-                "has_more": False
-            }
-        
-        import csv
-        logs = []
-        
-        with open(csv_file, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Apply filters
-                if operation and row.get('operation') != operation:
-                    continue
-                if status and row.get('status') != status:
-                    continue
-                logs.append(row)
+        # Get operations from CSV logger
+        operations = await csv_ops_logger.get_operations(
+            scope=scope,
+            action=action,
+            status=status,
+            limit=limit + offset  # Get more to handle pagination
+        )
         
         # Apply pagination
-        total = len(logs)
-        logs = logs[offset:offset + limit]
+        total = len(operations)
+        operations = operations[offset:offset + limit]
         
         return {
             "success": True,
-            "logs": logs,
+            "logs": operations,
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -83,6 +72,7 @@ async def get_operations_logs(
         }
         
     except Exception as e:
+        logger.error(f"Error getting operations logs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -108,23 +98,33 @@ async def get_orders_view_logs(
         Orders view logs with filtering and pagination
     """
     try:
-        result = unified_logger.get_orders(
-            state=state,
-            carrier=carrier,
-            limit=limit,
-            offset=offset
-        )
+        # Get all orders from unified order logger
+        all_orders = unified_order_logger.get_all_orders()
+        
+        # Apply filters
+        filtered_orders = []
+        for order in all_orders:
+            if state and order.get('internal_state') != state:
+                continue
+            if carrier and order.get('carrier_code') != carrier:
+                continue
+            filtered_orders.append(order)
+        
+        # Apply pagination
+        total = len(filtered_orders)
+        orders = filtered_orders[offset:offset + limit]
         
         return {
             "success": True,
-            "orders": result.get("orders", []),
-            "total": result.get("total", 0),
+            "orders": orders,
+            "total": total,
             "limit": limit,
             "offset": offset,
-            "has_more": result.get("has_more", False)
+            "has_more": offset + limit < total
         }
         
     except Exception as e:
+        logger.error(f"Error getting orders view logs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -142,17 +142,17 @@ async def export_operations_csv(
         CSV file download
     """
     try:
-        csv_file = settings.csv_log_file
-        if not os.path.exists(csv_file):
-            raise HTTPException(status_code=404, detail="Operations log file not found")
+        # Export CSV using the operations logger
+        export_path = await csv_ops_logger.export_csv()
         
         return FileResponse(
-            path=csv_file,
+            path=str(export_path),
             filename=f"operations_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv",
             media_type="text/csv"
         )
         
     except Exception as e:
+        logger.error(f"Error exporting operations CSV: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -170,17 +170,17 @@ async def export_orders_view_csv(
         CSV file download
     """
     try:
-        orders_file = settings.csv_log_file.replace('operations.csv', 'orders_view.csv')
-        if not os.path.exists(orders_file):
-            raise HTTPException(status_code=404, detail="Orders view file not found")
+        # Export CSV using the unified order logger
+        export_path = unified_order_logger.export_csv()
         
         return FileResponse(
-            path=orders_file,
+            path=export_path,
             filename=f"orders_view_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv",
             media_type="text/csv"
         )
         
     except Exception as e:
+        logger.error(f"Error exporting orders view CSV: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

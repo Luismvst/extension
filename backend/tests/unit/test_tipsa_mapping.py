@@ -44,9 +44,6 @@ def sample_order():
         totals=OrderTotals(
             goods=51.00,
             shipping=0
-        )
-    )
-
 
 class TestMapOrderToTIPSA:
     """Test order mapping to TIPSA format"""

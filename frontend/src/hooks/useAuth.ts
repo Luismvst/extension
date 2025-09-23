@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { jwtDecode } from 'jwt-decode'
+import { api, createTimeoutController, handleApiError } from '../lib/api'
 
 interface User {
   id: string
@@ -47,22 +48,16 @@ export const useAuth = () => {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const token = data.access_token
+      const controller = createTimeoutController(10000) // 10 second timeout
+      const response = await api.auth.login(email, password, controller.signal)
+      
+      if (response.data) {
+        const token = response.data.access_token
         
         localStorage.setItem('token', token)
         
         const decoded = jwtDecode(token) as any
-        setAuthState({
+        const newAuthState = {
           user: {
             id: decoded.sub,
             email: decoded.email,
@@ -70,25 +65,43 @@ export const useAuth = () => {
           },
           token,
           isAuthenticated: true,
-        })
+        }
+        
+        setAuthState(newAuthState)
+        
+        // Store token in a way that can be accessed by other components
+        if (typeof window !== 'undefined') {
+          (window as any).__authToken = token
+        }
         
         return { success: true }
       } else {
-        const error = await response.json()
-        return { success: false, error: error.detail }
+        return { success: false, error: 'No se recibió token de autenticación' }
       }
     } catch (error) {
-      return { success: false, error: 'Error de conexión' }
+      return { success: false, error: handleApiError(error) }
     }
   }
 
   const logout = () => {
     localStorage.removeItem('token')
+    
+    // Clear window token
+    if (typeof window !== 'undefined') {
+      delete (window as any).__authToken
+    }
+    
     setAuthState({
       user: null,
       token: null,
       isAuthenticated: false,
     })
+    
+    // Force a small delay to ensure state is updated before any redirects
+    setTimeout(() => {
+      // This ensures the login screen renders properly
+      window.location.reload()
+    }, 100)
   }
 
   return {

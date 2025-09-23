@@ -24,6 +24,7 @@ Sistema completo de orquestación entre Mirakl marketplace y transportistas (TIP
 
 ### 1. Levantar Sistema Completo
 
+#### Opción A: Docker (Recomendado para desarrollo completo)
 ```bash
 # Levantar todos los servicios
 docker compose up -d
@@ -33,6 +34,24 @@ docker compose logs -f
 
 # Verificar sistema
 powershell -ExecutionPolicy Bypass -File scripts/verify-complete-system.ps1
+```
+
+#### Opción B: Local (Para debugging rápido)
+```bash
+# Crear entorno virtual para backend
+python -m venv backend-env
+.\backend-env\Scripts\activate
+
+# Instalar dependencias
+pip install -r backend/requirements.txt
+
+# Iniciar backend
+python -m backend.app.main
+
+# En otra terminal, iniciar frontend
+cd frontend
+npm install
+npm run dev
 ```
 
 ### 2. URLs Disponibles
@@ -197,21 +216,36 @@ powershell -ExecutionPolicy Bypass -File scripts/verify-complete-system.ps1
 
 ## 📊 Logging y Monitoreo
 
-### Logs CSV
+### Sistema de Logging Estandarizado
 
-- **operations.csv**: Logs de operaciones del backend
-- **orders_view.csv**: Vista unificada de pedidos (Mirakl + Carrier + Interno)
+El sistema utiliza dos tipos de logs principales:
 
-### Logs JSON
+#### Operations Log (`operations.csv`)
+- **Ubicación**: `logs/operations.csv`
+- **Formato**: CSV con headers estandarizados
+- **Contenido**: Todas las operaciones del sistema (fetch, post, webhook, tracking)
+- **Headers**: `timestamp_iso, scope, action, order_id, carrier, marketplace, status, message, duration_ms, meta_json`
 
-- **dumps/**: Dumps de requests/responses para debugging
+#### Orders View (`orders_view.csv`) - "Tabla de la Verdad"
+- **Ubicación**: `logs/orders_view.csv`
+- **Formato**: CSV con snapshot por pedido
+- **Contenido**: Estado completo de cada pedido en el flujo Mirakl ↔ Carrier
+- **Campos**: Información completa del pedido, cliente, envío, tracking, etc.
 
 ### Endpoints de Logs
 
-- `GET /api/v1/logs/operations` - Logs de operaciones
-- `GET /api/v1/logs/orders-view` - Vista de pedidos
-- `GET /api/v1/logs/exports/*.csv` - Descarga de CSVs
-- `GET /api/v1/logs/stats` - Estadísticas
+- `GET /api/v1/logs/operations` - Consultar operaciones con filtros
+- `GET /api/v1/logs/orders-view` - Consultar vista de pedidos
+- `GET /api/v1/logs/exports/operations.csv` - Descargar CSV de operaciones
+- `GET /api/v1/logs/exports/orders-view.csv` - Descargar CSV de pedidos
+- `GET /api/v1/logs/stats` - Estadísticas del sistema
+
+### Logging en Tiempo Real
+
+- **Atomic writes**: Garantiza integridad de datos
+- **Async operations**: No bloquea el rendimiento
+- **Automatic headers**: Se crean automáticamente si no existen
+- **JSON metadata**: Información adicional en formato JSON
 
 ## 🔐 Seguridad
 

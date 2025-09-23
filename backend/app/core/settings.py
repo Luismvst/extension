@@ -76,9 +76,10 @@ class Settings(BaseSettings):
     
     # Logging
     log_level: str = "INFO"
-    log_file: str = "/app/logs/orchestrator.log"
-    csv_log_file: str = "/app/logs/operations.csv"
-    json_dumps_dir: str = "/app/logs/dumps"
+    log_dir: str = "logs"
+    log_file: str = "logs/orchestrator.log"
+    csv_log_file: str = "logs/operations.csv"
+    json_dumps_dir: str = "logs/dumps"
     
     # Business Rules
     default_carrier: str = "tipsa"

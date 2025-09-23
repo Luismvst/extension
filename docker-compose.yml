@@ -10,14 +10,21 @@ services:
     environment:
       - MIRAKL_MODE=mock
       - TIPSA_MODE=mock
-      - MIRAKL_BASE_URL=http://mock.mirakl
-      - TIPSA_BASE_URL=http://mock.tipsa
+      - MIRAKL_BASE_URL=http://mirakl-mock:3002
+      - TIPSA_BASE_URL=http://tipsa-mock:3001
       - LOG_DIR=/app/logs
+      - ORDERS_CSV_PATH=/app/logs/orders_view.csv
+      - RUN_TS=${RUN_TS:-}
+    depends_on:
+      - tipsa-mock
+      - mirakl-mock
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8080
     ports:
       - "3000:3000"
     depends_on:
@@ -46,3 +53,7 @@ services:
     volumes:
       - ./extension/dist:/app/dist
       - ./extension/out:/app/out
+
+networks:
+  default:
+    name: extension_net

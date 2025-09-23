@@ -20,8 +20,12 @@ from ..adapters.carriers.dhl import DHLAdapter
 from ..adapters.carriers.ups import UPSAdapter
 from ..rules.selector import select_carrier, get_carrier_info
 from ..core.auth import get_current_user
-from ..core.logging import csv_logger, json_dumper
-from ..core.unified_logger import unified_logger
+from ..utils.csv_ops_logger import csv_ops_logger
+from ..core.unified_order_logger import unified_order_logger
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/v1/orchestrator", tags=["orchestrator"])
@@ -115,13 +119,7 @@ async def load_orders_and_create_shipments(
                 
             except Exception as e:
                 # Log error but continue with other carriers
-                csv_logger.log_operation(
-                    operation="create_shipments_bulk",
-                    order_id="",
-                    status="ERROR",
-                    details=f"Error creating shipments for {carrier_code}: {e}",
-                    duration_ms=0
-                )
+                logger.error(f"Error creating shipments for carrier {carrier_code}: {e}")
                 carrier_breakdown[carrier_code] = {
                     "orders": len(order_list),
                     "shipments": 0,
@@ -135,26 +133,20 @@ async def load_orders_and_create_shipments(
         breakdown_str = ", ".join([f"{info['carrier_name']}:{info['shipments']}" 
                                  for info in carrier_breakdown.values() if info['shipments'] > 0])
         
-        csv_logger.log_operation(
-            operation="load_orders_and_create_shipments",
-            order_id="",
-            status="SUCCESS",
-            details=f"Processed {len(orders)} orders, created {len(all_shipments)} shipments ({breakdown_str})",
-            duration_ms=duration_ms
-        )
+        logger.info(f"load_orders_and_create_shipments: Processed {len(orders)} orders, created {len(all_shipments)} shipments ({breakdown_str})")
         
-        # Step 5: Dump request/response
-        json_dumper.dump_request_response(
-            operation="load_orders_and_create_shipments",
-            order_id="",
-            request_data={"orders_count": len(orders)},
-            response_data={
-                "orders_processed": len(orders),
-                "shipments_created": len(all_shipments),
-                "shipments": all_shipments,
-                "carrier_breakdown": carrier_breakdown
-            }
-        )
+        # Step 5: Dump request/response (disabled for now)
+        # # json_dumper.dump_request_response(
+        #     operation="load_orders_and_create_shipments",
+        #     order_id="",
+        #     request_data={"orders_count": len(orders)},
+        #     response_data={
+        #         "orders_processed": len(orders),
+        #         "shipments_created": len(all_shipments),
+        #         "shipments": all_shipments,
+        #         "carrier_breakdown": carrier_breakdown
+        #     }
+        # )
         
         return {
             "success": True,
@@ -167,13 +159,7 @@ async def load_orders_and_create_shipments(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="load_orders_and_create_shipments",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"load_orders_and_create_shipments: Error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -260,24 +246,18 @@ async def upload_tracking_to_mirakl(
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="upload_tracking_to_mirakl",
-            order_id="",
-            status="SUCCESS",
-            details=f"Updated tracking for {orders_updated} orders",
-            duration_ms=duration_ms
-        )
+        logger.info(f"upload_tracking_to_mirakl: SUCCESS, Updated tracking for {orders_updated} orders, duration_ms={duration_ms}")
         
         # Dump request/response
-        json_dumper.dump_request_response(
-            operation="upload_tracking_to_mirakl",
-            order_id="",
-            request_data={"tracking_data": tracking_data},
-            response_data={
-                "orders_updated": orders_updated,
-                "tracking_updates": tracking_updates
-            }
-        )
+        # json_dumper.dump_request_response(
+        #     operation="upload_tracking_to_mirakl",
+        #     order_id="",
+        #     request_data={"tracking_data": tracking_data},
+        #     response_data={
+        #         "orders_updated": orders_updated,
+        #         "tracking_updates": tracking_updates
+        #     }
+        # )
         
         return {
             "success": True,
@@ -288,13 +268,7 @@ async def upload_tracking_to_mirakl(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="upload_tracking_to_mirakl",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.info(f"upload_tracking_to_mirakl: ERROR, {str(e)}, duration_ms={duration_ms}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -370,32 +344,74 @@ async def fetch_orders_from_mirakl(
                 "orders_fetched": 0
             }
         
-        # Save orders to unified CSV
+        # Save orders to unified CSV and log operations
         for order in orders:
-            unified_logger.upsert_order({
-                'mirakl_order_id': order.get('order_id'),
-                'mirakl_status': order.get('status'),
-                'mirakl_customer_name': order.get('customer_name'),
-                'mirakl_customer_email': order.get('customer_email'),
-                'mirakl_weight': order.get('weight'),
-                'mirakl_total_amount': order.get('total_amount'),
-                'mirakl_currency': order.get('currency'),
-                'mirakl_created_at': order.get('created_at'),
-                'mirakl_shipping_address': json.dumps(order.get('shipping_address', {})),
+            order_id = order.get('order_id')
+            
+            # Save to unified order logger
+            unified_order_logger.upsert_order(order_id, {
+                'marketplace': 'mirakl',
+                'buyer_email': order.get('customer_email'),
+                'buyer_name': order.get('customer_name'),
+                'total_amount': order.get('total_amount'),
+                'currency': order.get('currency'),
+                'shipping_address': json.dumps(order.get('shipping_address', {})),
                 'internal_state': 'PENDING_POST',
-                'last_event': 'FETCHED_FROM_MIRAKL',
-                'last_event_at': datetime.utcnow().isoformat()
+                'created_at': order.get('created_at'),
+                'updated_at': datetime.utcnow().isoformat(),
+                'reference': order_id,
+                'consignee_name': order.get('customer_name'),
+                'consignee_address': json.dumps(order.get('shipping_address', {})),
+                'weight_kg': order.get('weight'),
+                'order_date': order.get('created_at'),
+                'client_name': order.get('customer_name'),
+                'destination_email': order.get('customer_email')
             })
+            
+            # Log individual order fetch operation
+            print(f"DEBUG: About to log individual order {order_id}")
+            try:
+                await csv_ops_logger.log(
+                    scope="mirakl",
+                    action="fetch_order",
+                    order_id=order_id,
+                    marketplace="mirakl",
+                    status="OK",
+                    message=f"Order {order_id} fetched from Mirakl",
+                    meta={"order_data": order}
+                )
+                print(f"DEBUG: Individual order {order_id} logged successfully")
+            except Exception as e:
+                print(f"DEBUG: Individual order {order_id} logging failed: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
         
-        # Log operation
+        # Log overall operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="fetch_orders_from_mirakl",
-            order_id="",
-            status="SUCCESS",
-            details=f"Fetched {len(orders)} orders from Mirakl",
-            duration_ms=duration_ms
-        )
+        print(f"DEBUG: About to call csv_ops_logger.log with duration_ms={duration_ms}")
+        print(f"DEBUG: csv_ops_logger type: {type(csv_ops_logger)}")
+        print(f"DEBUG: csv_ops_logger has log method: {hasattr(csv_ops_logger, 'log')}")
+        
+        try:
+            await csv_ops_logger.log(
+                scope="orchestrator",
+                action="fetch_orders_from_mirakl",
+                marketplace="mirakl",
+                status="OK",
+                message=f"Fetched {len(orders)} orders from Mirakl",
+                duration_ms=duration_ms,
+                meta={"orders_count": len(orders)}
+            )
+            print("DEBUG: csv_ops_logger.log completed successfully")
+        except Exception as e:
+            print(f"DEBUG: csv_ops_logger.log failed with error: {e}")
+            print(f"DEBUG: Error type: {type(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+        
+        logger.info(f"fetch_orders_from_mirakl: SUCCESS, Fetched {len(orders)} orders from Mirakl, duration_ms={duration_ms}")
         
         return {
             "success": True,
@@ -406,13 +422,7 @@ async def fetch_orders_from_mirakl(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="fetch_orders_from_mirakl",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"fetch_orders_from_mirakl: Error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -438,8 +448,8 @@ async def post_to_carrier(
     
     try:
         # Get pending orders from unified CSV
-        orders_result = unified_logger.get_orders(state="PENDING_POST", limit=50)
-        orders = orders_result.get("orders", [])
+        all_orders = unified_order_logger.get_all_orders()
+        orders = [order for order in all_orders if order.get('internal_state') == 'PENDING_POST'][:50]
         
         if not orders:
             return {
@@ -453,13 +463,13 @@ async def post_to_carrier(
         order_data = []
         for order in orders:
             order_data.append({
-                "order_id": order.get("mirakl_order_id"),
-                "customer_name": order.get("mirakl_customer_name"),
-                "customer_email": order.get("mirakl_customer_email"),
-                "weight": float(order.get("mirakl_weight", 0)),
-                "total_amount": float(order.get("mirakl_total_amount", 0)),
-                "currency": order.get("mirakl_currency", "EUR"),
-                "shipping_address": json.loads(order.get("mirakl_shipping_address", "{}"))
+                "order_id": order.get("order_id"),
+                "customer_name": order.get("buyer_name"),
+                "customer_email": order.get("buyer_email"),
+                "weight": float(order.get("weight_kg", 0)),
+                "total_amount": float(order.get("total_amount", 0)),
+                "currency": order.get("currency", "EUR"),
+                "shipping_address": json.loads(order.get("shipping_address", "{}"))
             })
         
         # Create shipments with carrier
@@ -467,28 +477,47 @@ async def post_to_carrier(
         result = await adapter.create_shipments_bulk(order_data)
         shipments = result.get("shipments", [])
         
-        # Update orders in unified CSV
+        # Update orders in unified CSV and log operations
         for i, order in enumerate(orders):
             if i < len(shipments):
                 shipment = shipments[i]
-                unified_logger.upsert_order({
-                    'mirakl_order_id': order.get('mirakl_order_id'),
+                order_id = order.get('order_id')
+                
+                # Update unified order logger
+                unified_order_logger.upsert_order(order_id, {
                     'carrier_code': carrier,
                     'carrier_name': adapter.carrier_name,
-                    'expedition_id': shipment.get('expedition_id'),
                     'tracking_number': shipment.get('tracking_number'),
-                    'carrier_status': shipment.get('status'),
-                    'label_url': shipment.get('label_url'),
-                    'carrier_cost': shipment.get('cost'),
-                    'carrier_created_at': shipment.get('created_at'),
                     'internal_state': 'POSTED',
-                    'last_event': 'POSTED_TO_CARRIER',
-                    'last_event_at': datetime.utcnow().isoformat()
+                    'updated_at': datetime.utcnow().isoformat(),
+                    'expedition_id': shipment.get('expedition_id'),
+                    'label_url': shipment.get('label_url')
                 })
+                
+                # Log individual shipment creation
+                await csv_ops_logger.log(
+                    scope="carrier",
+                    action="create_shipment",
+                    order_id=order_id,
+                    carrier=carrier,
+                    status="OK",
+                    message=f"Shipment created for order {order_id}",
+                    meta={"shipment_data": shipment}
+                )
         
-        # Log operation
+        # Log overall operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
+        await csv_ops_logger.log(
+            scope="orchestrator",
+            action="post_to_carrier",
+            carrier=carrier,
+            status="OK",
+            message=f"Posted {len(orders)} orders to {carrier}, created {len(shipments)} shipments",
+            duration_ms=duration_ms,
+            meta={"orders_count": len(orders), "shipments_count": len(shipments)}
+        )
+        
+        logger.info(
             operation="post_to_carrier",
             order_id="",
             status="SUCCESS",
@@ -506,7 +535,7 @@ async def post_to_carrier(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
+        logger.info(
             operation="post_to_carrier",
             order_id="",
             status="ERROR",
@@ -566,8 +595,7 @@ async def push_tracking_to_mirakl(
                 )
                 
                 # Update unified CSV
-                unified_logger.upsert_order({
-                    'mirakl_order_id': order_id,
+                unified_logger.upsert_order(order_id, {
                     'internal_state': 'MIRAKL_OK',
                     'last_event': 'TRACKING_PUSHED_TO_MIRAKL',
                     'last_event_at': datetime.utcnow().isoformat()
@@ -577,16 +605,18 @@ async def push_tracking_to_mirakl(
                 
             except Exception as e:
                 # Log error but continue with other orders
-                unified_logger.log_event(
-                    order.get("mirakl_order_id"),
-                    "FAILED_MIRAKL_UPDATE",
-                    str(e)
+                await csv_ops_logger.log(
+                    scope="orchestrator",
+                    action="push_tracking_to_mirakl",
+                    order_id=order.get("mirakl_order_id"),
+                    status="ERROR",
+                    message=f"Failed to update Mirakl: {str(e)}"
                 )
                 continue
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
+        logger.info(
             operation="push_tracking_to_mirakl",
             order_id="",
             status="SUCCESS",
@@ -603,7 +633,7 @@ async def push_tracking_to_mirakl(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
+        logger.info(
             operation="push_tracking_to_mirakl",
             order_id="",
             status="ERROR",

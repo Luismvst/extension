@@ -61,8 +61,7 @@ class RulesEngine:
             carrier=CarrierType.TIPSA,
             priority=100,
             description="Packages over 20kg go to TIPSA"
-        ))
-        
+
         # Rule 2: COD orders go to TIPSA
         self.add_rule(Rule(
             name="cod_orders",
@@ -70,8 +69,7 @@ class RulesEngine:
             carrier=CarrierType.TIPSA,
             priority=90,
             description="COD orders go to TIPSA"
-        ))
-        
+
         # Rule 3: Express service goes to DHL
         self.add_rule(Rule(
             name="express_service",
@@ -79,8 +77,7 @@ class RulesEngine:
             carrier=CarrierType.DHL,
             priority=80,
             description="Express service goes to DHL"
-        ))
-        
+
         # Rule 4: International orders go to DHL
         self.add_rule(Rule(
             name="international_orders",
@@ -88,8 +85,7 @@ class RulesEngine:
             carrier=CarrierType.DHL,
             priority=70,
             description="International orders go to DHL"
-        ))
-        
+
         # Rule 5: Default to TIPSA
         self.add_rule(Rule(
             name="default_tipsa",
@@ -97,8 +93,7 @@ class RulesEngine:
             carrier=CarrierType.TIPSA,
             priority=0,
             description="Default carrier is TIPSA"
-        ))
-    
+
     def _load_rules_from_config(self) -> None:
         """Load rules from configuration file."""
         if not self.rules_config_path:

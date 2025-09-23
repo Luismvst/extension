@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import {
   AppBar,
   Box,
@@ -45,6 +45,7 @@ function App() {
   const { logout, isAuthenticated } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const location = useLocation()
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
@@ -63,10 +64,6 @@ function App() {
     handleProfileMenuClose()
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
   const drawer = (
     <div>
       <Toolbar>
@@ -78,7 +75,12 @@ function App() {
       <List>
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
-            <ListItemButton>
+            <ListItemButton
+              component={Link}
+              to={item.path}
+              selected={location.pathname === item.path}
+              onClick={() => setMobileOpen(false)}
+            >
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
@@ -87,6 +89,15 @@ function App() {
       </List>
     </div>
   )
+
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -193,7 +204,6 @@ function App() {
       >
         <Toolbar />
         <Routes>
-          <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/configuration" element={<Configuration />} />

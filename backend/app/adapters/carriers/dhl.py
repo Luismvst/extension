@@ -12,7 +12,10 @@ import random
 from typing import Dict, Any, List, Optional
 from ..interfaces.carrier import CarrierAdapter
 from ...core.settings import settings
-from ...core.logging import csv_logger, json_dumper
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class DHLAdapter(CarrierAdapter):
@@ -54,25 +57,16 @@ class DHLAdapter(CarrierAdapter):
                 result = await self._create_shipment_real(order_data)
             
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="create_dhl_shipment",
-                order_id=order_data.get("order_id", ""),
-                status="SUCCESS",
-                details=f"Created shipment {result.get('shipment_id', '')}",
-                duration_ms=duration_ms
+            logger.info(
+                f"Created shipment {result.get('shipment_id', '')}",
+                status="SUCCESS"
             )
             
             return result
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="create_dhl_shipment",
-                order_id=order_data.get("order_id", ""),
-                status="ERROR",
-                details=str(e),
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed: {str(e)}, status=ERROR")
             raise
     
     async def create_shipments_bulk(self, orders_data: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -94,25 +88,13 @@ class DHLAdapter(CarrierAdapter):
                 result = await self._create_shipments_bulk_real(orders_data)
             
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="create_dhl_shipments_bulk",
-                order_id="",
-                status="SUCCESS",
-                details=f"Created {result.get('total_created', 0)} shipments",
-                duration_ms=duration_ms
-            )
+            logger.info(f"shipments, duration_ms={duration_ms}")
             
             return result
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="create_dhl_shipments_bulk",
-                order_id="",
-                status="ERROR",
-                details=str(e),
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             raise
     
     async def get_shipment_status(self, shipment_id: str) -> Dict[str, Any]:
@@ -134,25 +116,13 @@ class DHLAdapter(CarrierAdapter):
                 result = await self._get_shipment_status_real(shipment_id)
             
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="get_dhl_shipment_status",
-                order_id=shipment_id,
-                status="SUCCESS",
-                details=f"Retrieved status: {result.get('status', '')}",
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             
             return result
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="get_dhl_shipment_status",
-                order_id=shipment_id,
-                status="ERROR",
-                details=str(e),
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             raise
     
     async def get_shipment_label(self, shipment_id: str) -> bytes:
@@ -174,25 +144,13 @@ class DHLAdapter(CarrierAdapter):
                 result = await self._get_shipment_label_real(shipment_id)
             
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="get_dhl_shipment_label",
-                order_id=shipment_id,
-                status="SUCCESS",
-                details="Retrieved label",
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             
             return result
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="get_dhl_shipment_label",
-                order_id=shipment_id,
-                status="ERROR",
-                details=str(e),
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             raise
     
     async def cancel_shipment(self, shipment_id: str, cancel_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -215,25 +173,13 @@ class DHLAdapter(CarrierAdapter):
                 result = await self._cancel_shipment_real(shipment_id, cancel_data)
             
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="cancel_dhl_shipment",
-                order_id=shipment_id,
-                status="SUCCESS",
-                details="Shipment cancelled",
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             
             return result
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            csv_logger.log_operation(
-                operation="cancel_dhl_shipment",
-                order_id=shipment_id,
-                status="ERROR",
-                details=str(e),
-                duration_ms=duration_ms
-            )
+            logger.info(f"Operation completed")
             raise
     
     # Mock implementations

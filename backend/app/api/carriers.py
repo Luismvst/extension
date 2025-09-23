@@ -17,7 +17,10 @@ from ..adapters.carriers.ontime import OnTimeAdapter
 from ..adapters.carriers.seur import SeurAdapter
 from ..adapters.carriers.correosex import CorreosExAdapter
 from ..core.auth import get_current_user
-from ..core.logging import csv_logger, json_dumper
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 from ..core.settings import settings
 
 # Create router
@@ -97,13 +100,7 @@ async def create_shipments(
         duration_ms = int((time.time() - start_time) * 1000)
         successful_jobs = [job for job in jobs if job["status"] == "CREATED"]
         
-        csv_logger.log_operation(
-            operation="create_shipments_batch",
-            order_id="",
-            status="SUCCESS",
-            details=f"Created {len(successful_jobs)}/{len(jobs)} shipments with {carrier}",
-            duration_ms=duration_ms
-        )
+        logger.info(f"Created {len(successful_jobs)}/{len(jobs)} shipments with {carrier}, duration_ms={duration_ms}")
         
         return {
             "success": True,
@@ -116,13 +113,7 @@ async def create_shipments(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        csv_logger.log_operation(
-            operation="create_shipments_batch",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.error(f"Error creating shipments with {carrier}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -151,22 +142,12 @@ async def get_shipment_status(
     try:
         result = await adapter.get_shipment_status(expedition_id)
         
-        csv_logger.log_operation(
-            operation="get_shipment_status",
-            order_id=expedition_id,
-            status="SUCCESS",
-            details=f"Retrieved status for {carrier} shipment {expedition_id}"
-        )
+        logger.info(f"Retrieved shipment status for {expedition_id}")
         
         return result
         
     except Exception as e:
-        csv_logger.log_operation(
-            operation="get_shipment_status",
-            order_id=expedition_id,
-            status="ERROR",
-            details=str(e)
-        )
+        logger.error(f"Error getting shipment status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -225,11 +206,9 @@ async def receive_webhook(
         processed_event = adapter.process_webhook_event(event_data)
         
         # Log webhook reception
-        csv_logger.log_operation(
-            operation="receive_webhook",
-            order_id=processed_event.get("expedition_id", ""),
-            status="SUCCESS",
-            details=f"Processed {carrier} webhook: {processed_event.get('event_type', 'unknown')}"
+        logger.info(
+            f"Processed {carrier} webhook: {processed_event.get('event_type', 'unknown')}",
+            status="SUCCESS"
         )
         
         # TODO: In production, this would trigger background processing
@@ -240,12 +219,7 @@ async def receive_webhook(
     except HTTPException:
         raise
     except Exception as e:
-        csv_logger.log_operation(
-            operation="receive_webhook",
-            order_id="",
-            status="ERROR",
-            details=f"Webhook processing error: {str(e)}"
-        )
+        logger.error(f"Error processing {carrier} webhook: {str(e)}")
         # Always return 202 to prevent carrier retries
         return {"status": "accepted", "error": "Processing failed", "carrier": carrier}
 

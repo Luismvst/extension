@@ -11,7 +11,10 @@ from datetime import datetime
 
 from ..interfaces.marketplace import MarketplaceAdapter
 from ...core.settings import settings
-from ...core.logging import csv_logger, json_dumper
+import logging
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class MiraklAdapter(MarketplaceAdapter):
@@ -147,13 +150,7 @@ class MiraklAdapter(MarketplaceAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="get_orders",
-            order_id="",
-            status="SUCCESS",
-            details=f"Retrieved {len(paginated_orders)} orders",
-            duration_ms=50
-        )
+        logger.info(f"get_orders: Retrieved {len(result.get('orders', []))} orders")
         
         return result
     
@@ -170,14 +167,25 @@ class MiraklAdapter(MarketplaceAdapter):
             "offset": offset
         }
         
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                self.endpoints["orders"],
-                headers=headers,
-                params=params
-            )
-            response.raise_for_status()
-            return response.json()
+        timeout = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(
+                    self.endpoints["orders"],
+                    headers=headers,
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.TimeoutException as e:
+            self.logger.error(f"Timeout getting orders from Mirakl: {e}", exc_info=True)
+            raise Exception(f"Request timeout: {e}")
+        except httpx.HTTPError as e:
+            self.logger.error(f"HTTP error getting orders from Mirakl: {e}", exc_info=True)
+            raise Exception(f"HTTP error: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error getting orders from Mirakl: {e}", exc_info=True)
+            raise Exception(f"Request failed: {e}")
     
     async def get_order_details(self, order_id: str) -> Dict[str, Any]:
         """Get detailed information for a specific order."""
@@ -217,13 +225,7 @@ class MiraklAdapter(MarketplaceAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="get_order_details",
-            order_id=order_id,
-            status="SUCCESS",
-            details="Retrieved order details",
-            duration_ms=30
-        )
+        logger.info(f"Operation completed")
         
         return mock_details
     
@@ -270,13 +272,7 @@ class MiraklAdapter(MarketplaceAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="update_order_tracking",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Updated tracking: {tracking_number}",
-            duration_ms=40
-        )
+        logger.info(f"Operation completed")
         
         return result
     
@@ -326,13 +322,7 @@ class MiraklAdapter(MarketplaceAdapter):
         }
         
         # Log operation
-        csv_logger.log_operation(
-            operation="update_order_status",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Updated status to {status}",
-            duration_ms=35
-        )
+        logger.info(f"Operation completed")
         
         return result
     
@@ -381,12 +371,7 @@ class MiraklAdapter(MarketplaceAdapter):
     async def _update_order_ship_mock(self, order_id: str, carrier_code: str, 
                                     carrier_name: str, tracking_number: str) -> Dict[str, Any]:
         """Mock implementation of update_order_ship."""
-        csv_logger.log_operation(
-            operation="update_order_ship",
-            order_id=order_id,
-            status="SUCCESS",
-            details=f"Mock: Order {order_id} marked as SHIPPED with {carrier_name} {tracking_number}"
-        )
+        logger.info(f"Operation completed")
         
         return {
             "order_id": order_id,
@@ -441,12 +426,7 @@ class MiraklAdapter(MarketplaceAdapter):
     
     async def _update_shipments_tracking_mock(self, shipments: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Mock implementation of update_shipments_tracking."""
-        csv_logger.log_operation(
-            operation="update_shipments_tracking",
-            order_id="",
-            status="SUCCESS",
-            details=f"Mock: Updated tracking for {len(shipments)} shipments"
-        )
+        logger.info(f"update_shipments_tracking: Updated {len(shipments)} shipments")
         
         return {
             "updated_shipments": len(shipments),
