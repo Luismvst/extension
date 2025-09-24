@@ -17,6 +17,7 @@ from ..adapters.carriers.ontime import OnTimeAdapter
 from ..adapters.carriers.seur import SeurAdapter
 from ..adapters.carriers.correosex import CorreosExAdapter
 from ..core.auth import get_current_user
+from ..models.order import ShipmentRequest
 import logging
 
 # Create logger for this module
@@ -25,6 +26,10 @@ from ..core.settings import settings
 
 # Create router
 router = APIRouter(prefix="/api/v1/carriers", tags=["carriers"])
+
+
+
+
 
 # Initialize adapters
 tipsa_adapter = TipsaAdapter()
@@ -52,7 +57,7 @@ WEBHOOK_SECRETS = {
 @router.post("/{carrier}/shipments")
 async def create_shipments(
     carrier: str,
-    orders: List[Dict[str, Any]],
+    request: ShipmentRequest,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -60,7 +65,7 @@ async def create_shipments(
     
     Args:
         carrier: Carrier code (tipsa, ontime, seur, correosex)
-        orders: List of order data
+        request: Shipment request with orders and parameters
         current_user: Authenticated user
         
     Returns:
@@ -76,19 +81,19 @@ async def create_shipments(
     try:
         # Create shipments with idempotency
         jobs = []
-        for order in orders:
+        for order in request.orders:
             try:
                 result = await adapter.create_shipment_with_idempotency(order)
                 jobs.append({
-                    "order_id": order.get("order_id"),
-                    "expedition_id": result.get("expedition_id"),
+                    "order_id": order.order_id,
+                    "expedition_id": result.get("expedition_id") if isinstance(result, dict) else getattr(result, "expedition_id", None),
                     "status": "CREATED",
                     "carrier": carrier,
                     "created_at": datetime.utcnow().isoformat()
                 })
             except Exception as e:
                 jobs.append({
-                    "order_id": order.get("order_id"),
+                    "order_id": order.order_id,
                     "expedition_id": None,
                     "status": "ERROR",
                     "error": str(e),
@@ -105,7 +110,7 @@ async def create_shipments(
         return {
             "success": True,
             "carrier": carrier,
-            "total_orders": len(orders),
+            "total_orders": len(request.orders),
             "successful_shipments": len(successful_jobs),
             "failed_shipments": len(jobs) - len(successful_jobs),
             "jobs": jobs

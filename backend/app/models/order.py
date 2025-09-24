@@ -135,6 +135,7 @@ class ShipmentRequest(BaseModel):
     orders: List[OrderStandard] = Field(..., min_items=1, description="Orders to ship")
     carrier: str = Field(..., description="Carrier name")
     service: Optional[str] = Field(None, description="Service type")
+    
 
 
 class ShipmentResponse(BaseModel):

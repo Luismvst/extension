@@ -15,38 +15,87 @@ Authorization: Bearer <your-jwt-token>
 ## Endpoints Overview
 
 ### Health & Status
-- `GET /api/v1/health` - Health check endpoint
-- `GET /` - Root endpoint with basic info
+- `GET /api/v1/health` - Health check endpoint ✅
+- `GET /` - Root endpoint with basic info ✅
 
 ### Authentication
-- `POST /auth/login` - User login
-- `GET /auth/me` - Get current user info
-- `POST /auth/validate` - Validate JWT token
+- `POST /auth/login` - User login ✅
+- `GET /auth/me` - Get current user info ✅
+- `POST /auth/validate` - Validate JWT token ✅
 
 ### Marketplaces
-- `GET /api/v1/marketplaces/mirakl/orders` - Get orders from Mirakl
-- `POST /api/v1/marketplaces/mirakl/orders` - Create order in Mirakl
-- `PUT /api/v1/marketplaces/mirakl/orders/{order_id}` - Update order in Mirakl
-- `POST /api/v1/marketplaces/mirakl/tracking` - Update tracking in Mirakl
+- `GET /api/v1/marketplaces/mirakl/orders` - Get orders from Mirakl ✅
+- `POST /api/v1/marketplaces/mirakl/orders` - Create order in Mirakl ✅
+- `PUT /api/v1/marketplaces/mirakl/orders/{order_id}` - Update order in Mirakl ✅
+- `POST /api/v1/marketplaces/mirakl/tracking` - Update tracking in Mirakl ✅
 
-### Carriers
-- `GET /api/v1/carriers/tipsa/shipments` - Get shipments from TIPSA
-- `POST /api/v1/carriers/tipsa/shipments` - Create shipment in TIPSA
-- `GET /api/v1/carriers/tipsa/shipments/{shipment_id}` - Get specific shipment
-- `POST /api/v1/carriers/tipsa/webhook` - TIPSA webhook endpoint
+### Carriers (Dynamic Routes)
+- `POST /api/v1/carriers/{carrier}/shipments` - Create shipments for any carrier ✅
+- `GET /api/v1/carriers/{carrier}/shipments/{expedition_id}` - Get shipment status ✅
+- `POST /api/v1/carriers/webhooks/{carrier}` - Carrier webhook endpoint ✅
+- `GET /api/v1/carriers/{carrier}/health` - Get carrier health status ✅
+- `GET /api/v1/carriers/health` - Get all carriers health status ✅
+
+**Available carriers**: `tipsa`, `ontime`, `seur`, `correosex`, `dhl`, `ups`
+
+**✅ Note**: The `/shipments` endpoint now works correctly with proper JSON format and ASCII characters.
+
+**Important Requirements**:
+- Use ASCII characters only (no special characters like "é", "ñ", "ü")
+- Date format: ISO 8601 without "Z" (e.g., "2025-01-01T10:00:00")
+- Status must be one of: PENDING, ACCEPTED, SHIPPED, DELIVERED, CANCELLED
+- Totals must use `goods` and `shipping` fields, not `subtotal`, `tax`, `total`
+
+**Example Request Body**:
+```json
+{
+  "orders": [
+    {
+      "order_id": "MIR-001",
+      "created_at": "2025-01-01T10:00:00",
+      "status": "PENDING",
+      "items": [
+        {
+          "sku": "SKU001",
+          "name": "Producto Test",
+          "qty": 1,
+          "unit_price": 45.99
+        }
+      ],
+      "buyer": {
+        "name": "Juan Perez",
+        "email": "juan@example.com"
+      },
+      "shipping": {
+        "name": "Juan Perez",
+        "address1": "Calle Mayor 123",
+        "city": "Madrid",
+        "postcode": "28001",
+        "country": "ES"
+      },
+      "totals": {
+        "goods": 45.99,
+        "shipping": 0
+      }
+    }
+  ],
+  "carrier": "tipsa",
+  "service": "ESTANDAR"
+}
+```
 
 ### Orchestrator (Main Workflow)
-- `POST /api/v1/orchestrator/fetch-orders` - Fetch orders from Mirakl
-- `POST /api/v1/orchestrator/post-to-carrier` - Post orders to carrier
-- `POST /api/v1/orchestrator/push-tracking-to-mirakl` - Push tracking to Mirakl
-- `GET /api/v1/orchestrator/orders-view` - Get orders view
+- `POST /api/v1/orchestrator/fetch-orders` - Fetch orders from Mirakl ✅
+- `POST /api/v1/orchestrator/post-to-carrier` - Post orders to carrier ✅
+- `POST /api/v1/orchestrator/push-tracking-to-mirakl` - Push tracking to Mirakl ✅
+- `GET /api/v1/orchestrator/orders-view` - Get orders view ✅
 
 ### Logs & Exports
-- `GET /api/v1/logs/operations` - Get operations logs
-- `GET /api/v1/logs/orders-view` - Get orders view logs
-- `GET /api/v1/logs/exports/operations.csv` - Export operations CSV
-- `GET /api/v1/logs/exports/orders-view.csv` - Export orders view CSV
-- `GET /api/v1/logs/stats` - Get logs statistics
+- `GET /api/v1/logs/operations` - Get operations logs ✅
+- `GET /api/v1/logs/orders-view` - Get orders view logs ✅
+- `GET /api/v1/logs/exports/operations.csv` - Export operations CSV ✅
+- `GET /api/v1/logs/exports/orders-view.csv` - Export orders view CSV ✅
+- `GET /api/v1/logs/stats` - Get logs statistics ✅
 
 ---
 
@@ -132,6 +181,213 @@ Validate JWT token.
   "valid": true,
   "user_id": "user123",
   "expires_at": "2025-01-01T13:00:00Z"
+}
+```
+
+### Carriers (Dynamic Routes)
+
+#### POST /api/v1/carriers/{carrier}/test
+Test endpoint to verify carrier routing works.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `carrier`: Carrier code (tipsa, ontime, seur, correosex, dhl, ups)
+
+**Response:**
+```json
+{
+  "success": true,
+  "carrier": "tipsa",
+  "message": "Carrier tipsa endpoint is working",
+  "user": "admin@test.com"
+}
+```
+
+#### POST /api/v1/carriers/{carrier}/shipments-simple
+Simple shipments endpoint without complex validation.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `carrier`: Carrier code
+
+**Response:**
+```json
+{
+  "success": true,
+  "carrier": "tipsa",
+  "message": "Simple shipments endpoint working for tipsa",
+  "user": "admin@test.com"
+}
+```
+
+#### POST /api/v1/carriers/{carrier}/shipments
+Create shipments for any carrier.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `carrier`: Carrier code (tipsa, ontime, seur, correosex, dhl, ups)
+
+**Request Body:**
+```json
+{
+  "orders": [
+    {
+      "order_id": "MIR-001",
+      "customer_name": "Juan Pérez",
+      "customer_email": "juan@example.com",
+      "shipping_address": {
+        "street": "Calle Mayor 123",
+        "city": "Madrid",
+        "postal_code": "28001",
+        "country": "ES"
+      },
+      "weight": 2.5,
+      "total_amount": 45.99,
+      "currency": "EUR"
+    }
+  ],
+  "service": "ESTANDAR",
+  "carrier": "tipsa"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "carrier": "tipsa",
+  "total_orders": 1,
+  "successful_jobs": 1,
+  "failed_jobs": 0,
+  "jobs": [
+    {
+      "order_id": "MIR-001",
+      "status": "CREATED",
+      "tracking_number": "TRK123456789",
+      "expedition_id": "EXP001",
+      "carrier_reference": "TIPS001"
+    }
+  ]
+}
+```
+
+#### GET /api/v1/carriers/{carrier}/shipments/{expedition_id}
+Get shipment status for a specific expedition.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `carrier`: Carrier code
+- `expedition_id`: Expedition identifier
+
+**Response:**
+```json
+{
+  "success": true,
+  "expedition_id": "EXP001",
+  "status": "IN_TRANSIT",
+  "tracking_number": "TRK123456789",
+  "carrier": "tipsa",
+  "created_at": "2025-01-01T10:00:00Z",
+  "updated_at": "2025-01-01T12:00:00Z",
+  "events": [
+    {
+      "timestamp": "2025-01-01T10:00:00Z",
+      "status": "CREATED",
+      "description": "Shipment created"
+    },
+    {
+      "timestamp": "2025-01-01T12:00:00Z",
+      "status": "IN_TRANSIT",
+      "description": "Package in transit"
+    }
+  ]
+}
+```
+
+#### POST /api/v1/carriers/webhooks/{carrier}
+Receive webhook notifications from carriers.
+
+**Path Parameters:**
+- `carrier`: Carrier code
+
+**Headers:**
+- `Content-Type: application/json`
+- `X-Webhook-Signature`: Webhook signature for verification
+
+**Request Body:**
+```json
+{
+  "expedition_id": "EXP001",
+  "tracking_number": "TRK123456789",
+  "status": "DELIVERED",
+  "timestamp": "2025-01-01T14:00:00Z",
+  "location": "Madrid, Spain",
+  "description": "Package delivered successfully"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Webhook processed successfully",
+  "expedition_id": "EXP001",
+  "status_updated": true
+}
+```
+
+#### GET /api/v1/carriers/{carrier}/health
+Get health status for a specific carrier.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `carrier`: Carrier code
+
+**Response:**
+```json
+{
+  "carrier": "tipsa",
+  "status": "healthy",
+  "last_check": "2025-01-01T12:00:00Z",
+  "api_available": true,
+  "response_time_ms": 150,
+  "version": "1.0.0"
+}
+```
+
+#### GET /api/v1/carriers/health
+Get health status for all carriers.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "overall_status": "healthy",
+  "last_check": "2025-01-01T12:00:00Z",
+  "carriers": {
+    "tipsa": {
+      "status": "healthy",
+      "api_available": true,
+      "response_time_ms": 150
+    },
+    "ontime": {
+      "status": "healthy",
+      "api_available": true,
+      "response_time_ms": 200
+    },
+    "seur": {
+      "status": "degraded",
+      "api_available": false,
+      "response_time_ms": null,
+      "error": "API timeout"
+    }
+  }
 }
 ```
 
