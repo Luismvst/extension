@@ -83,7 +83,9 @@ async def create_shipments(
         jobs = []
         for order in request.orders:
             try:
-                result = await adapter.create_shipment_with_idempotency(order)
+                # Convert OrderStandard to dict
+                order_dict = order.dict()
+                result = await adapter.create_shipment_with_idempotency(order_dict)
                 jobs.append({
                     "order_id": order.order_id,
                     "expedition_id": result.get("expedition_id") if isinstance(result, dict) else getattr(result, "expedition_id", None),
@@ -212,8 +214,7 @@ async def receive_webhook(
         
         # Log webhook reception
         logger.info(
-            f"Processed {carrier} webhook: {processed_event.get('event_type', 'unknown')}",
-            status="SUCCESS"
+            f"Processed {carrier} webhook: {processed_event.get('event_type', 'unknown')}"
         )
         
         # TODO: In production, this would trigger background processing

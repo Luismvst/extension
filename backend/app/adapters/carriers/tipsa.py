@@ -84,7 +84,7 @@ class TipsaAdapter(CarrierAdapter):
         }
         
         # Log operation
-        logger.info(f"Retrieved shipment status for {expedition_id}")
+        logger.info(f"Created mock shipment {shipment_id}")
         
         return result
     

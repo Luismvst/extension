@@ -757,20 +757,131 @@ curl -X GET "http://localhost:8080/api/v1/health"
 
 ### Authentication
 ```bash
+# Login
 curl -X POST "http://localhost:8080/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
+
+# Get current user (replace <token> with actual token)
+curl -X GET "http://localhost:8080/auth/me" \
+  -H "Authorization: Bearer <token>"
+
+# Validate token
+curl -X POST "http://localhost:8080/auth/validate" \
+  -H "Authorization: Bearer <token>"
 ```
 
-### Fetch Orders
+### Carrier Operations
 ```bash
+# Create shipment
+curl -X POST "http://localhost:8080/api/v1/carriers/tipsa/shipments" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orders": [{
+      "order_id": "MIR-001",
+      "created_at": "2025-01-01T10:00:00",
+      "status": "PENDING",
+      "items": [{
+        "sku": "SKU001",
+        "name": "Producto Test",
+        "qty": 1,
+        "unit_price": 45.99
+      }],
+      "buyer": {
+        "name": "Juan Perez",
+        "email": "juan@example.com"
+      },
+      "shipping": {
+        "name": "Juan Perez",
+        "address1": "Calle Mayor 123",
+        "city": "Madrid",
+        "postcode": "28001",
+        "country": "ES"
+      },
+      "totals": {
+        "goods": 45.99,
+        "shipping": 0
+      }
+    }],
+    "carrier": "tipsa",
+    "service": "ESTANDAR"
+  }'
+
+# Get shipment status (replace <expedition_id> with actual ID)
+curl -X GET "http://localhost:8080/api/v1/carriers/tipsa/shipments/<expedition_id>" \
+  -H "Authorization: Bearer <token>"
+
+# Carrier health
+curl -X GET "http://localhost:8080/api/v1/carriers/tipsa/health" \
+  -H "Authorization: Bearer <token>"
+```
+
+### Webhook Testing
+```bash
+# TIPSA webhook
+curl -X POST "http://localhost:8080/api/v1/carriers/webhooks/tipsa" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "shipment_update",
+    "expedition_id": "TIPSA-MIR-0013852",
+    "tracking_number": "1Z-0013852",
+    "status": "IN_TRANSIT",
+    "timestamp": "2025-01-01T12:00:00Z",
+    "location": "Madrid, Spain",
+    "description": "Package in transit"
+  }'
+```
+
+### Orchestrator Operations
+```bash
+# Fetch orders from Mirakl
 curl -X POST "http://localhost:8080/api/v1/orchestrator/fetch-orders" \
-  -H "Authorization: Bearer <your-token>"
+  -H "Authorization: Bearer <token>"
+
+# Post orders to carrier
+curl -X POST "http://localhost:8080/api/v1/orchestrator/post-to-carrier?carrier=tipsa" \
+  -H "Authorization: Bearer <token>"
+
+# Push tracking to Mirakl
+curl -X POST "http://localhost:8080/api/v1/orchestrator/push-tracking-to-mirakl" \
+  -H "Authorization: Bearer <token>"
+
+# Get orders view
+curl -X GET "http://localhost:8080/api/v1/orchestrator/orders-view" \
+  -H "Authorization: Bearer <token>"
 ```
 
-### Export CSV
+### Logs & Exports
 ```bash
+# Get operations logs
+curl -X GET "http://localhost:8080/api/v1/logs/operations" \
+  -H "Authorization: Bearer <token>"
+
+# Get orders view logs
+curl -X GET "http://localhost:8080/api/v1/logs/orders-view" \
+  -H "Authorization: Bearer <token>"
+
+# Export operations CSV
 curl -X GET "http://localhost:8080/api/v1/logs/exports/operations.csv" \
-  -H "Authorization: Bearer <your-token>" \
+  -H "Authorization: Bearer <token>" \
   -o operations.csv
+
+# Export orders view CSV
+curl -X GET "http://localhost:8080/api/v1/logs/exports/orders-view.csv" \
+  -H "Authorization: Bearer <token>" \
+  -o orders_view.csv
+
+# Get logs statistics
+curl -X GET "http://localhost:8080/api/v1/logs/stats" \
+  -H "Authorization: Bearer <token>"
 ```
+
+### PowerShell Script (Windows)
+Para Windows, también puedes usar el script de PowerShell incluido:
+```powershell
+# Ejecutar el script completo de pruebas
+.\test_endpoints.ps1
+```
+
+Este script contiene todos los ejemplos pre-rellenados y se puede ejecutar directamente para probar todos los endpoints.

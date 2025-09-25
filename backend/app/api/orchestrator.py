@@ -517,13 +517,7 @@ async def post_to_carrier(
             meta={"orders_count": len(orders), "shipments_count": len(shipments)}
         )
         
-        logger.info(
-            operation="post_to_carrier",
-            order_id="",
-            status="SUCCESS",
-            details=f"Posted {len(orders)} orders to {carrier}, created {len(shipments)} shipments",
-            duration_ms=duration_ms
-        )
+        logger.info(f"post_to_carrier: Posted {len(orders)} orders to {carrier}, created {len(shipments)} shipments")
         
         return {
             "success": True,
@@ -535,13 +529,7 @@ async def post_to_carrier(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        logger.info(
-            operation="post_to_carrier",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.info(f"post_to_carrier operation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -562,8 +550,7 @@ async def push_tracking_to_mirakl(
     
     try:
         # Get orders with tracking (AWAITING_TRACKING state)
-        orders_result = unified_logger.get_orders(state="AWAITING_TRACKING", limit=50)
-        orders = orders_result.get("orders", [])
+        orders = unified_order_logger.get_orders_by_state("AWAITING_TRACKING")
         
         if not orders:
             return {
@@ -595,7 +582,7 @@ async def push_tracking_to_mirakl(
                 )
                 
                 # Update unified CSV
-                unified_logger.upsert_order(order_id, {
+                unified_order_logger.upsert_order(order_id, {
                     'internal_state': 'MIRAKL_OK',
                     'last_event': 'TRACKING_PUSHED_TO_MIRAKL',
                     'last_event_at': datetime.utcnow().isoformat()
@@ -616,13 +603,7 @@ async def push_tracking_to_mirakl(
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
-        logger.info(
-            operation="push_tracking_to_mirakl",
-            order_id="",
-            status="SUCCESS",
-            details=f"Updated tracking for {updated_orders} orders in Mirakl",
-            duration_ms=duration_ms
-        )
+        logger.info(f"push_tracking_to_mirakl: Updated tracking for {updated_orders} orders in Mirakl")
         
         return {
             "success": True,
@@ -633,13 +614,7 @@ async def push_tracking_to_mirakl(
         
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        logger.info(
-            operation="push_tracking_to_mirakl",
-            order_id="",
-            status="ERROR",
-            details=str(e),
-            duration_ms=duration_ms
-        )
+        logger.info(f"push_tracking_to_mirakl operation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -665,12 +640,29 @@ async def get_orders_view(
         Unified orders view with filtering and pagination
     """
     try:
-        result = unified_logger.get_orders(
-            state=state,
-            carrier=carrier,
-            limit=limit,
-            offset=offset
-        )
+        # Get all orders and filter manually for now
+        all_orders = unified_order_logger.get_all_orders()
+        
+        # Apply filters
+        filtered_orders = all_orders
+        if state:
+            filtered_orders = [order for order in filtered_orders if order.get('internal_state') == state]
+        if carrier:
+            filtered_orders = [order for order in filtered_orders if order.get('carrier_code') == carrier]
+        
+        # Apply pagination
+        total = len(filtered_orders)
+        start = offset
+        end = offset + limit
+        paginated_orders = filtered_orders[start:end]
+        
+        result = {
+            "orders": paginated_orders,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": end < total
+        }
         
         return {
             "success": True,
