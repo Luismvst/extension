@@ -27,8 +27,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY backend/ .
 
-# Create non-root user
+# Create non-root user and logs directory
 RUN useradd --create-home --shell /bin/bash app \
+    && mkdir -p /app/logs \
     && chown -R app:app /app
 USER app
 

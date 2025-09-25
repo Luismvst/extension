@@ -5,7 +5,7 @@ This module contains the main orchestration endpoints that coordinate
 between marketplaces and carriers for the Mirakl-TIPSA Orchestrator.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Dict, Any, List
 import time
 import json
@@ -453,7 +453,7 @@ async def refresh_marketplace(
         
         # Fetch orders from Mirakl
         logger.info(f"refresh_marketplace: Fetching orders from {marketplace}")
-        orders_data = await mirakl_adapter.get_orders()
+        orders_data = await mirakl_adapter.get_orders(status="SHIPPED")
         
         if not orders_data or not orders_data.get("orders"):
             return {
@@ -470,36 +470,8 @@ async def refresh_marketplace(
         # Process each order
         for order_data in orders:
             try:
-                # Transform Mirakl order to standard format
-                standard_order = OrderStandard(
-                    order_id=order_data.get("order_id"),
-                    created_at=datetime.fromisoformat(order_data.get("created_date", "2024-01-01T00:00:00")),
-                    status=order_data.get("order_state", "PENDING"),
-                    items=[],  # Will be populated from order lines
-                    buyer={
-                        "name": order_data.get("customer", {}).get("firstname", "") + " " + order_data.get("customer", {}).get("lastname", ""),
-                        "email": order_data.get("customer", {}).get("email", ""),
-                        "phone": order_data.get("customer", {}).get("phone", "")
-                    },
-                    shipping={
-                        "name": order_data.get("shipping_address", {}).get("firstname", "") + " " + order_data.get("shipping_address", {}).get("lastname", ""),
-                        "address1": order_data.get("shipping_address", {}).get("street_1", ""),
-                        "address2": order_data.get("shipping_address", {}).get("street_2", ""),
-                        "city": order_data.get("shipping_address", {}).get("city", ""),
-                        "state": order_data.get("shipping_address", {}).get("state", ""),
-                        "postal_code": order_data.get("shipping_address", {}).get("zip_code", ""),
-                        "country": order_data.get("shipping_address", {}).get("country", "")
-                    },
-                    totals={
-                        "subtotal": float(order_data.get("total_price", 0)),
-                        "shipping": float(order_data.get("shipping_price", 0)),
-                        "tax": float(order_data.get("total_tax", 0)),
-                        "total": float(order_data.get("total_price", 0)),
-                        "currency": order_data.get("currency_code", "EUR")
-                    },
-                    estado_mirakl=order_data.get("order_state", "PENDING"),
-                    estado_tipsa="PENDING"
-                )
+                # Data is already in standard format from mock
+                standard_order = OrderStandard(**order_data)
                 
                 # Add to storage (will update if exists)
                 order_storage_service.store_order(standard_order)
@@ -551,7 +523,7 @@ async def refresh_marketplace(
 @router.post("/post-to-carrier")
 async def post_to_carrier(
     carrier: str,
-    order_ids: List[str] = None,
+    order_ids: List[str] = Query(None),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -632,13 +604,14 @@ async def post_to_carrier(
                 # Update order status in storage
                 from ..models.order import OrderUpdateRequest
                 update_data = OrderUpdateRequest(
+                    order_id=order_id,
                     estado_tipsa='SENT',
                     tracking_number=shipment.get('tracking_number'),
                     carrier_code=carrier,
                     carrier_name=adapter.carrier_name,
                     synced_to_carrier=True
                 )
-                order_storage_service.update_order(order_id, update_data)
+                order_storage_service.update_order_status(order_id, update_data)
                 
                 # Log individual shipment creation
                 await csv_ops_logger.log(

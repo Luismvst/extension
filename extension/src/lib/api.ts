@@ -99,7 +99,10 @@ export class ApiClient {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response: AxiosResponse<LoginResponse> = await this.client.post(
       '/auth/login',
-      credentials
+      {
+        email: credentials.username,  // Map username to email for backend
+        password: credentials.password
+      }
     )
     
     await this.setAuthToken(response.data.access_token)
@@ -374,8 +377,8 @@ export class ApiClient {
     }
 
     const response: AxiosResponse<any> = await this.client.post(
-      '/api/v1/orchestrator/refresh-marketplace',
-      { marketplace },
+      `/api/v1/orchestrator/refresh-marketplace?marketplace=${encodeURIComponent(marketplace)}`,
+      {},
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -393,7 +396,7 @@ export class ApiClient {
     }
 
     const response: AxiosResponse<string> = await this.client.get(
-      '/api/v1/orders/export-csv',
+      '/api/v1/orders/export/csv',
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -412,8 +415,8 @@ export class ApiClient {
     }
 
     const response: AxiosResponse<any> = await this.client.post(
-      '/api/v1/orchestrator/post-to-carrier',
-      { carrier, order_ids: orderIds },
+      `/api/v1/orchestrator/post-to-carrier?carrier=${encodeURIComponent(carrier)}&${orderIds.map(id => `order_ids=${encodeURIComponent(id)}`).join('&')}`,
+      {},
       {
         headers: {
           'Authorization': `Bearer ${token}`

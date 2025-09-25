@@ -62,55 +62,100 @@ class MiraklAdapter(MarketplaceAdapter):
             {
                 "order_id": "MIR-001",
                 "marketplace": "mirakl",
-                "status": "PENDING",
-                "customer_name": "Juan Pérez",
-                "customer_email": "juan.perez@email.com",
-                "weight": 2.5,
-                "total_amount": 45.99,
-                "currency": "EUR",
+                "status": "SHIPPED",
                 "created_at": "2025-09-19T20:00:00Z",
-                "shipping_address": {
+                "items": [
+                    {
+                        "sku": "SKU-001",
+                        "name": "Producto Test 1",
+                        "qty": 2,
+                        "unit_price": 22.99,
+                        "weight_kg": 1.5
+                    }
+                ],
+                "buyer": {
                     "name": "Juan Pérez",
-                    "street": "Calle Mayor 123",
+                    "email": "juan.perez@email.com",
+                    "phone": "+34612345678"
+                },
+                "shipping": {
+                    "name": "Juan Pérez",
+                    "address1": "Calle Mayor 123",
                     "city": "Madrid",
                     "postal_code": "28001",
                     "country": "ES"
+                },
+                "totals": {
+                    "goods": 45.98,
+                    "shipping": 0.0,
+                    "total": 45.98,
+                    "currency": "EUR"
                 }
             },
             {
                 "order_id": "MIR-002",
                 "marketplace": "mirakl",
-                "status": "PENDING_APPROVAL",
-                "customer_name": "María García",
-                "customer_email": "maria.garcia@email.com",
-                "weight": 1.8,
-                "total_amount": 32.50,
-                "currency": "EUR",
+                "status": "SHIPPED",
                 "created_at": "2025-09-19T21:00:00Z",
-                "shipping_address": {
+                "items": [
+                    {
+                        "sku": "SKU-002",
+                        "name": "Producto Test 2",
+                        "qty": 1,
+                        "unit_price": 32.50,
+                        "weight_kg": 0.8
+                    }
+                ],
+                "buyer": {
                     "name": "María García",
-                    "street": "Avenida de la Paz 456",
+                    "email": "maria.garcia@email.com",
+                    "phone": "+34687654321"
+                },
+                "shipping": {
+                    "name": "María García",
+                    "address1": "Avenida de la Paz 456",
                     "city": "Barcelona",
                     "postal_code": "08001",
                     "country": "ES"
+                },
+                "totals": {
+                    "goods": 32.50,
+                    "shipping": 0.0,
+                    "total": 32.50,
+                    "currency": "EUR"
                 }
             },
             {
                 "order_id": "MIR-003",
                 "marketplace": "mirakl",
-                "status": "SHIPPING",
-                "customer_name": "Carlos López",
-                "customer_email": "carlos.lopez@email.com",
-                "weight": 3.2,
-                "total_amount": 67.80,
-                "currency": "EUR",
+                "status": "SHIPPED",
                 "created_at": "2025-09-19T18:00:00Z",
-                "shipping_address": {
+                "items": [
+                    {
+                        "sku": "SKU-003",
+                        "name": "Producto Test 3",
+                        "qty": 3,
+                        "unit_price": 22.60,
+                        "weight_kg": 2.0
+                    }
+                ],
+                "buyer": {
                     "name": "Carlos López",
-                    "street": "Plaza España 789",
+                    "email": "carlos.lopez@email.com",
+                    "phone": "+34987654321"
+                },
+                "shipping": {
+                    "name": "Carlos López",
+                    "address1": "Plaza España 789",
                     "city": "Valencia",
                     "postal_code": "46001",
                     "country": "ES"
+                },
+                "totals": {
+                    "goods": 67.80,
+                    "shipping": 0.0,
+                    "total": 67.80,
+                    "currency": "EUR"
                 }
             },
             {

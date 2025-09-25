@@ -411,3 +411,75 @@ async def export_orders_csv(
     except Exception as e:
         logger.error(f"Error exporting orders CSV: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/create-test-orders")
+async def create_test_orders(
+    count: int = 3,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Create test orders for development and testing.
+    
+    Args:
+        count: Number of test orders to create
+        current_user: Authenticated user
+    
+    Returns:
+        List of created order IDs
+    """
+    try:
+        from ..models.order import OrderStandard, OrderItem, Buyer, ShippingAddress, Totals
+        
+        created_orders = []
+        
+        for i in range(count):
+            order_id = f"TEST-{datetime.now().strftime('%Y%m%d')}-{i+1:03d}"
+            
+            # Create test order data
+            test_order = OrderStandard(
+                order_id=order_id,
+                created_at=datetime.now(),
+                marketplace="test",
+                items=[
+                    OrderItem(
+                        sku=f"SKU-{i+1}",
+                        name=f"Test Product {i+1}",
+                        qty=1,
+                        unit_price=10.0 + i * 5.0
+                    )
+                ],
+                buyer=Buyer(
+                    name=f"Test Customer {i+1}",
+                    email=f"customer{i+1}@test.com",
+                    phone="+34123456789"
+                ),
+                shipping=ShippingAddress(
+                    name=f"Test Customer {i+1}",
+                    address1=f"Test Street {i+1}",
+                    city="Madrid",
+                    postal_code="28001",
+                    country="ES"
+                ),
+                totals=Totals(
+                    total=10.0 + i * 5.0,
+                    currency="EUR"
+                ),
+                status="SHIPPING"
+            )
+            
+            # Store the order
+            order_storage.add_order(test_order)
+            created_orders.append(order_id)
+            
+            logger.info(f"Created test order: {order_id}")
+        
+        return {
+            "success": True,
+            "message": f"Created {count} test orders",
+            "order_ids": created_orders
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating test orders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

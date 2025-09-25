@@ -12,6 +12,7 @@ class OrderItem(BaseModel):
     name: str = Field(..., min_length=1, description="Product name")
     qty: int = Field(..., gt=0, description="Quantity")
     unit_price: float = Field(..., gt=0, description="Unit price")
+    weight_kg: Optional[float] = Field(1.0, ge=0, description="Weight in kg")
     
     @validator('unit_price')
     def validate_unit_price(cls, v):
@@ -39,7 +40,8 @@ class ShippingAddress(BaseModel):
     address1: str = Field(..., min_length=1, description="Address line 1")
     address2: Optional[str] = Field(None, description="Address line 2")
     city: str = Field(..., min_length=1, description="City")
-    postcode: str = Field(..., min_length=1, description="Postal code")
+    state: Optional[str] = Field(None, description="State/Province")
+    postal_code: str = Field(..., min_length=1, description="Postal code")
     country: str = Field(..., min_length=2, max_length=2, description="Country code")
     
     @validator('country')
@@ -51,8 +53,10 @@ class OrderTotals(BaseModel):
     """Order totals model"""
     goods: float = Field(..., ge=0, description="Goods total")
     shipping: Optional[float] = Field(0, ge=0, description="Shipping cost")
+    total: Optional[float] = Field(None, ge=0, description="Total amount")
+    currency: str = Field("EUR", description="Currency code")
     
-    @validator('goods', 'shipping')
+    @validator('goods', 'shipping', 'total')
     def validate_amounts(cls, v):
         return round(v, 2) if v is not None else v
 

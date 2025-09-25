@@ -95,8 +95,8 @@ const PopupApp: React.FC = () => {
   })
   const [tabValue, setTabValue] = useState(0)
   const [loginForm, setLoginForm] = useState<LoginRequest>({
-    username: 'admin',
-    password: 'admin123'
+    username: 'test@example.com',
+    password: 'test123'
   })
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -360,7 +360,7 @@ const PopupApp: React.FC = () => {
               <TextField
                 fullWidth
                 label="Username"
-                placeholder="admin (for testing)"
+                placeholder="test@example.com (for testing)"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
                 margin="normal"
@@ -373,7 +373,7 @@ const PopupApp: React.FC = () => {
                 fullWidth
                 label="Password"
                 type="password"
-                placeholder="admin123 (for testing)"
+                placeholder="test123 (for testing)"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
                 margin="normal"
@@ -393,7 +393,7 @@ const PopupApp: React.FC = () => {
 
             <Box sx={{ mt: 3, textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                Default credentials: admin / admin123
+                Default credentials: test@example.com / test123
               </Typography>
             </Box>
           </CardContent>
