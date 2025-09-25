@@ -426,16 +426,140 @@ async def fetch_orders_from_mirakl(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/post-to-carrier")
-async def post_to_carrier(
-    carrier: str,
+@router.post("/refresh-marketplace")
+async def refresh_marketplace(
+    marketplace: str = "mirakl",
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Post pending orders to specified carrier.
+    Refresh orders from marketplace and update local storage.
+    
+    Args:
+        marketplace: Marketplace name (default: mirakl)
+        current_user: Authenticated user
+        
+    Returns:
+        Refresh results with updated order count
+    """
+    start_time = time.time()
+    
+    if marketplace.lower() != "mirakl":
+        raise HTTPException(status_code=400, detail=f"Only Mirakl marketplace is currently supported")
+    
+    try:
+        # Import order storage service
+        from ..services.order_storage import order_storage_service
+        from ..models.order import OrderStandard
+        
+        # Fetch orders from Mirakl
+        logger.info(f"refresh_marketplace: Fetching orders from {marketplace}")
+        orders_data = await mirakl_adapter.get_orders()
+        
+        if not orders_data or not orders_data.get("orders"):
+            return {
+                "success": True,
+                "message": "No orders found in marketplace",
+                "orders_processed": 0,
+                "orders_updated": 0
+            }
+        
+        orders = orders_data["orders"]
+        processed_count = 0
+        updated_count = 0
+        
+        # Process each order
+        for order_data in orders:
+            try:
+                # Transform Mirakl order to standard format
+                standard_order = OrderStandard(
+                    order_id=order_data.get("order_id"),
+                    created_at=datetime.fromisoformat(order_data.get("created_date", "2024-01-01T00:00:00")),
+                    status=order_data.get("order_state", "PENDING"),
+                    items=[],  # Will be populated from order lines
+                    buyer={
+                        "name": order_data.get("customer", {}).get("firstname", "") + " " + order_data.get("customer", {}).get("lastname", ""),
+                        "email": order_data.get("customer", {}).get("email", ""),
+                        "phone": order_data.get("customer", {}).get("phone", "")
+                    },
+                    shipping={
+                        "name": order_data.get("shipping_address", {}).get("firstname", "") + " " + order_data.get("shipping_address", {}).get("lastname", ""),
+                        "address1": order_data.get("shipping_address", {}).get("street_1", ""),
+                        "address2": order_data.get("shipping_address", {}).get("street_2", ""),
+                        "city": order_data.get("shipping_address", {}).get("city", ""),
+                        "state": order_data.get("shipping_address", {}).get("state", ""),
+                        "postal_code": order_data.get("shipping_address", {}).get("zip_code", ""),
+                        "country": order_data.get("shipping_address", {}).get("country", "")
+                    },
+                    totals={
+                        "subtotal": float(order_data.get("total_price", 0)),
+                        "shipping": float(order_data.get("shipping_price", 0)),
+                        "tax": float(order_data.get("total_tax", 0)),
+                        "total": float(order_data.get("total_price", 0)),
+                        "currency": order_data.get("currency_code", "EUR")
+                    },
+                    estado_mirakl=order_data.get("order_state", "PENDING"),
+                    estado_tipsa="PENDING"
+                )
+                
+                # Add to storage (will update if exists)
+                order_storage_service.store_order(standard_order)
+                updated_count += 1
+                processed_count += 1
+                
+            except Exception as e:
+                logger.warning(f"refresh_marketplace: Error processing order {order_data.get('order_id', 'unknown')}: {str(e)}")
+                continue
+        
+        # Log operation
+        duration_ms = int((time.time() - start_time) * 1000)
+        await csv_ops_logger.log(
+            scope="orchestrator",
+            action="refresh_marketplace",
+            marketplace=marketplace,
+            status="OK",
+            message=f"Refreshed {processed_count} orders from {marketplace}",
+            duration_ms=duration_ms,
+            meta={"orders_processed": processed_count, "orders_updated": updated_count}
+        )
+        
+        logger.info(f"refresh_marketplace: Refreshed {processed_count} orders from {marketplace}")
+        
+        return {
+            "success": True,
+            "message": f"Successfully refreshed {processed_count} orders from {marketplace}",
+            "orders_processed": processed_count,
+            "orders_updated": updated_count,
+            "duration_ms": duration_ms
+        }
+        
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"refresh_marketplace: Error - {str(e)}")
+        
+        await csv_ops_logger.log(
+            scope="orchestrator",
+            action="refresh_marketplace",
+            marketplace=marketplace,
+            status="ERROR",
+            message=f"Error refreshing marketplace: {str(e)}",
+            duration_ms=duration_ms
+        )
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/post-to-carrier")
+async def post_to_carrier(
+    carrier: str,
+    order_ids: List[str] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Post selected orders to specified carrier.
     
     Args:
         carrier: Carrier code
+        order_ids: List of order IDs to send (optional, sends all pending if not provided)
         current_user: Authenticated user
         
     Returns:
@@ -447,9 +571,22 @@ async def post_to_carrier(
         raise HTTPException(status_code=400, detail=f"Unsupported carrier: {carrier}")
     
     try:
-        # Get pending orders from unified CSV
-        all_orders = unified_order_logger.get_all_orders()
-        orders = [order for order in all_orders if order.get('internal_state') == 'PENDING_POST'][:50]
+        # Import order storage service
+        from ..services.order_storage import order_storage_service
+        
+        # Get orders from storage
+        if order_ids:
+            # Get specific orders
+            orders = []
+            for order_id in order_ids:
+                order = order_storage_service.get_order(order_id)
+                if order and order.estado_tipsa == 'PENDING':
+                    orders.append(order)
+        else:
+            # Get all pending orders
+            orders = order_storage_service.get_orders_by_status(estado_tipsa='PENDING')
+            # Apply limit
+            orders = orders[:50]
         
         if not orders:
             return {
@@ -459,17 +596,26 @@ async def post_to_carrier(
                 "shipments_created": 0
             }
         
-        # Transform to order format
+        # Transform to order format for carrier
         order_data = []
-        for order in orders:
+        for order_storage in orders:
+            order = order_storage.order_data
             order_data.append({
-                "order_id": order.get("order_id"),
-                "customer_name": order.get("buyer_name"),
-                "customer_email": order.get("buyer_email"),
-                "weight": float(order.get("weight_kg", 0)),
-                "total_amount": float(order.get("total_amount", 0)),
-                "currency": order.get("currency", "EUR"),
-                "shipping_address": json.loads(order.get("shipping_address", "{}"))
+                "order_id": order.order_id,
+                "customer_name": order.buyer.name,
+                "customer_email": order.buyer.email,
+                "weight": sum(item.weight_kg or 0 for item in order.items),
+                "total_amount": float(order.totals.total),
+                "currency": order.totals.currency,
+                "shipping_address": {
+                    "name": order.shipping.name,
+                    "address1": order.shipping.address1,
+                    "address2": order.shipping.address2,
+                    "city": order.shipping.city,
+                    "state": order.shipping.state,
+                    "postal_code": order.shipping.postal_code,
+                    "country": order.shipping.country
+                }
             })
         
         # Create shipments with carrier
@@ -477,22 +623,22 @@ async def post_to_carrier(
         result = await adapter.create_shipments_bulk(order_data)
         shipments = result.get("shipments", [])
         
-        # Update orders in unified CSV and log operations
-        for i, order in enumerate(orders):
+        # Update orders in storage and log operations
+        for i, order_storage in enumerate(orders):
             if i < len(shipments):
                 shipment = shipments[i]
-                order_id = order.get('order_id')
+                order_id = order_storage.order_id
                 
-                # Update unified order logger
-                unified_order_logger.upsert_order(order_id, {
-                    'carrier_code': carrier,
-                    'carrier_name': adapter.carrier_name,
-                    'tracking_number': shipment.get('tracking_number'),
-                    'internal_state': 'POSTED',
-                    'updated_at': datetime.utcnow().isoformat(),
-                    'expedition_id': shipment.get('expedition_id'),
-                    'label_url': shipment.get('label_url')
-                })
+                # Update order status in storage
+                from ..models.order import OrderUpdateRequest
+                update_data = OrderUpdateRequest(
+                    estado_tipsa='SENT',
+                    tracking_number=shipment.get('tracking_number'),
+                    carrier_code=carrier,
+                    carrier_name=adapter.carrier_name,
+                    synced_to_carrier=True
+                )
+                order_storage_service.update_order(order_id, update_data)
                 
                 # Log individual shipment creation
                 await csv_ops_logger.log(

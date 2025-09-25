@@ -17,7 +17,12 @@
     "preview": "vite preview",
     "package:zip": "node scripts/zip-dist.mjs",
     "verify:sentinels": "node scripts/verify-sentinels.mjs",
-    "prebuild": "npm run clean"
+    "prebuild": "npm run clean",
+    "setup:env": "powershell -ExecutionPolicy Bypass -File scripts/setup-frontend-env.ps1",
+    "activate:env": "powershell -ExecutionPolicy Bypass -File scripts/activate-frontend-env.ps1",
+    "dev:env": "frontend-env\\Scripts\\activate && npm run dev",
+    "build:env": "frontend-env\\Scripts\\activate && npm run build",
+    "test:env": "frontend-env\\Scripts\\activate && npm run test:unit"
   },
   "dependencies": {
     "react": "^18.2.0",

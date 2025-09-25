@@ -33,27 +33,17 @@ export default defineConfig({
       input: {
         popup: resolve(__dirname, 'src/popup/index.html'),
         options: resolve(__dirname, 'src/options/index.html'),
-        content: resolve(__dirname, 'src/content/index.ts'),
         background: resolve(__dirname, 'src/background/index.ts')
       },
       output: {
         entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'content') {
-            return 'content/index.js'
-          }
           if (chunkInfo.name === 'background') {
             return 'background.js' // Service worker must be in root
           }
           return '[name].js'
         },
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: ({ name }) => {
-          // CSS files go to content directory
-          if (name && name.endsWith('.css')) {
-            return 'content/styles.css'
-          }
-          return 'assets/[name].[ext]'
-        }
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },

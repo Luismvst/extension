@@ -47,3 +47,4 @@ Write-Host "Frontend: http://localhost:3000" -ForegroundColor White
 Write-Host "Backend: http://localhost:8080" -ForegroundColor White
 Write-Host "Extension: extension/dist/" -ForegroundColor White
 
+

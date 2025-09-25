@@ -14,13 +14,6 @@
     "default_title": "Mirakl Tipsa MVP"
   },
   "options_page": "options.html",
-  "content_scripts": [
-    {
-      "matches": ["*://*.tipsa.com/*", "*://localhost:*/*", "*://127.0.0.1:*/*"],
-      "js": ["content/index.js"],
-      "css": ["content/styles.css"]
-    }
-  ],
   "background": {
     "service_worker": "background/index.js"
   },
@@ -31,14 +24,7 @@
     "downloads"
   ],
   "host_permissions": [
-    "*://*.tipsa.com/*",
     "*://localhost:*/*",
     "*://127.0.0.1:*/*"
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["content/*"],
-      "matches": ["*://*.tipsa.com/*", "*://localhost:*/*", "*://127.0.0.1:*/*"]
-    }
   ]
 }

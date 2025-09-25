@@ -33,3 +33,4 @@ Write-Host "Backend API: http://localhost:8080" -ForegroundColor White
 Write-Host "API Docs: http://localhost:8080/docs" -ForegroundColor White
 Write-Host "Logs: Get-Content backend/logs/run-*.log -Wait" -ForegroundColor White
 
+

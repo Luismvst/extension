@@ -1,3 +1,0 @@
-Order ID,Order Date,Status,SKU,Product,Qty,Price,Buyer Name,Buyer Email,Phone,Ship To,Address 1,Address 2,City,Postal Code,Country,Total
-ORD-009,2024-01-15,PENDING,SKU-606,Product I,1,200.00,Grace Taylor,grace@example.com,+34999000111,Grace Taylor,606 Spruce St,,Seville,41002,ES,200.00
-ORD-010,2024-01-15,ACCEPTED,SKU-707,Product J,3,45.00,Henry Davis,henry@example.com,+34000111222,Henry Davis,707 Poplar St,Floor 3,Bilbao,48002,ES,135.00

@@ -367,6 +367,63 @@ export class ApiClient {
     return response.data
   }
 
+  async refreshMarketplace(marketplace: string): Promise<any> {
+    const token = await this.getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response: AxiosResponse<any> = await this.client.post(
+      '/api/v1/orchestrator/refresh-marketplace',
+      { marketplace },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    )
+
+    return response.data
+  }
+
+  async exportOrdersCSV(): Promise<string> {
+    const token = await this.getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response: AxiosResponse<string> = await this.client.get(
+      '/api/v1/orders/export-csv',
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        responseType: 'text'
+      }
+    )
+
+    return response.data
+  }
+
+  async postToCarrier(carrier: string, orderIds: string[]): Promise<any> {
+    const token = await this.getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response: AxiosResponse<any> = await this.client.post(
+      '/api/v1/orchestrator/post-to-carrier',
+      { carrier, order_ids: orderIds },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    )
+
+    return response.data
+  }
+
   // Utility methods
   isAuthenticated(): boolean {
     return !!this.getAuthToken()

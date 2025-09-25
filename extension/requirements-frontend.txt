@@ -1,0 +1,12 @@
+# Frontend Environment Requirements
+# This file contains Python packages needed for frontend development tools
+
+# Build tools
+nodeenv>=1.8.0
+
+# Development utilities
+watchdog>=3.0.0
+python-dotenv>=1.0.0
+
+# Optional: If you want to use Python for any frontend build scripts
+requests>=2.31.0

@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 import uvicorn
 
 # Import routers
-from .api import marketplaces, carriers, orchestrator, health, auth, logs
+from .api import marketplaces, carriers, orchestrator, health, auth, logs, orders
 
 # Configure logging
 import logging
@@ -101,7 +101,7 @@ app.include_router(marketplaces.router)
 app.include_router(carriers.router)
 app.include_router(orchestrator.router)
 app.include_router(logs.router)
-# app.include_router(test.router)  # Removed - test router no longer exists
+app.include_router(orders.router)
 
 
 if __name__ == "__main__":

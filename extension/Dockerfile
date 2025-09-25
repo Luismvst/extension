@@ -11,12 +11,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the extension (without cleaning dist since it's mounted)
+# Build the extension
 RUN npm run build
-
-# Ensure dist directory exists and copy files
-RUN mkdir -p /app/dist && \
-    cp -r dist/* /app/dist/ || true
 
 # Copy HTML files to root directory (Vite generates them in subdirectories)
 RUN if [ -f /app/dist/src/popup/index.html ]; then \
@@ -27,13 +23,8 @@ RUN if [ -f /app/dist/src/popup/index.html ]; then \
     fi && \
     echo "HTML files copied to root directory"
 
-# Copy CSS files to content directory (ensure it exists)
-RUN mkdir -p /app/dist/content && \
-    if [ -f /app/dist/content/styles.css ]; then \
-        echo "CSS already in place"; \
-    else \
-        cp src/content/styles.css /app/dist/content/styles.css; \
-    fi
+# Create content directory (no CSS files needed since content scripts were removed)
+RUN mkdir -p /app/dist/content
 
 # Verify build output
 RUN echo "=== DIST ROOT ===" && \

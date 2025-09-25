@@ -67,6 +67,15 @@ class OrderStandard(BaseModel):
     shipping: ShippingAddress = Field(..., description="Shipping address")
     totals: OrderTotals = Field(..., description="Order totals")
     
+    # Status tracking fields
+    estado_mirakl: Optional[str] = Field(None, description="Mirakl order status")
+    estado_tipsa: Optional[str] = Field(None, description="TIPSA order status")
+    tracking_number: Optional[str] = Field(None, description="Tracking number")
+    carrier_code: Optional[str] = Field(None, description="Carrier code")
+    carrier_name: Optional[str] = Field(None, description="Carrier name")
+    synced_to_mirakl: Optional[bool] = Field(False, description="Whether synced to Mirakl")
+    synced_to_carrier: Optional[bool] = Field(False, description="Whether synced to carrier")
+    
     @validator('status')
     def validate_status(cls, v):
         valid_statuses = ['PENDING', 'ACCEPTED', 'SHIPPED', 'DELIVERED', 'CANCELLED']
@@ -163,3 +172,32 @@ class TrackingResponse(BaseModel):
     tracking_number: str = Field(..., description="Tracking number")
     status: str = Field(..., description="Updated status")
     updated_at: datetime = Field(..., description="Update timestamp")
+
+
+class OrderStorage(BaseModel):
+    """Order storage model for persistence"""
+    order_id: str = Field(..., description="Order ID")
+    order_data: OrderStandard = Field(..., description="Order data")
+    created_at: datetime = Field(..., description="Storage creation date")
+    updated_at: datetime = Field(..., description="Last update date")
+    estado_mirakl: str = Field("PENDING", description="Mirakl order status")
+    estado_tipsa: str = Field("PENDING", description="TIPSA order status")
+    tracking_number: Optional[str] = Field(None, description="Tracking number")
+    carrier_code: Optional[str] = Field(None, description="Carrier code")
+    carrier_name: Optional[str] = Field(None, description="Carrier name")
+    synced_to_mirakl: bool = Field(False, description="Whether synced to Mirakl")
+    synced_to_carrier: bool = Field(False, description="Whether synced to carrier")
+    notes: Optional[str] = Field(None, description="Additional notes")
+
+
+class OrderUpdateRequest(BaseModel):
+    """Request model for updating order status"""
+    order_id: str = Field(..., description="Order ID")
+    estado_mirakl: Optional[str] = Field(None, description="Mirakl order status")
+    estado_tipsa: Optional[str] = Field(None, description="TIPSA order status")
+    tracking_number: Optional[str] = Field(None, description="Tracking number")
+    carrier_code: Optional[str] = Field(None, description="Carrier code")
+    carrier_name: Optional[str] = Field(None, description="Carrier name")
+    synced_to_mirakl: Optional[bool] = Field(None, description="Whether synced to Mirakl")
+    synced_to_carrier: Optional[bool] = Field(None, description="Whether synced to carrier")
+    notes: Optional[str] = Field(None, description="Additional notes")

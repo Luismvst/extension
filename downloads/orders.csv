@@ -1,3 +1,0 @@
-Order ID,Order Date,Status,SKU,Product,Qty,Price,Buyer Name,Buyer Email,Phone,Ship To,Address 1,Address 2,City,Postal Code,Country,Total
-ORD-001,2024-01-15,PENDING,SKU-123,Product A,2,25.50,John Doe,john@example.com,+34123456789,John Doe,123 Main St,Apt 4B,Madrid,28001,ES,51.00
-ORD-002,2024-01-15,ACCEPTED,SKU-456,Product B,1,45.00,Jane Smith,jane@example.com,+34987654321,Jane Smith,456 Oak Ave,,Barcelona,08001,ES,45.00

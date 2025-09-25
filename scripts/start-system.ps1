@@ -29,3 +29,4 @@ Write-Host "Backend: http://localhost:8080" -ForegroundColor White
 Write-Host "Extension: extension/dist/" -ForegroundColor White
 Write-Host "`nTo check system status: .\scripts\check-all.ps1" -ForegroundColor Cyan
 
+

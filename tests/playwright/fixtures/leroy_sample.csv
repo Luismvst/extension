@@ -1,4 +1,0 @@
-Order ID,Order Date,Status,SKU,Product,Qty,Price,Buyer Name,Buyer Email,Phone,Ship To,Address 1,Address 2,City,Postal Code,Country,Total
-ORD-006,2024-01-15,PENDING,SKU-303,Product F,1,75.00,David Lee,david@example.com,+34666777888,David Lee,303 Maple St,,Madrid,28002,ES,75.00
-ORD-007,2024-01-15,ACCEPTED,SKU-404,Product G,2,32.50,Eva Garcia,eva@example.com,+34777888999,Eva Garcia,404 Birch St,Apt 1,Barcelona,08002,ES,65.00
-ORD-008,2024-01-15,SHIPPED,SKU-505,Product H,1,150.00,Frank Miller,frank@example.com,+34888999000,Frank Miller,505 Cedar St,,Valencia,46002,ES,150.00

@@ -36,6 +36,7 @@ import { FrontLogger } from '@/lib/frontLogger';
 import { CsvExporter } from '@/lib/exportCsv';
 import { Order, ShipmentResult } from '@/types';
 import { BUILD_INFO } from '@/lib/buildInfo';
+import { theme } from '@/theme';
 
 // Types
 type LoadingAction = 'LOAD' | 'CREATE' | 'UPLOAD' | null;
