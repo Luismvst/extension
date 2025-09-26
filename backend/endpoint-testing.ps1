@@ -55,7 +55,7 @@ Write-Host "`n=== 2. AUTHENTICATION ENDPOINTS ===" -ForegroundColor Yellow
 Write-Host "`n2.1. Login"
 $loginBody = @{
     email = "test@example.com"
-    password = "password123"
+    password = "test123"
 } | ConvertTo-Json
 
 $loginResponse = Invoke-APIRequest -Uri "$baseUrl/auth/login" -Method POST -Body $loginBody

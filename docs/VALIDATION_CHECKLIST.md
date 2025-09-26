@@ -101,7 +101,7 @@ This document provides a comprehensive checklist to validate the Mirakl-TIPSA Or
   ```bash
   curl -X POST http://localhost:8080/auth/login \
     -H "Content-Type: application/json" \
-    -d '{"email": "admin@example.com", "password": "password123"}'
+    -d '{"email": "admin@example.com", "password": "test123"}'
   ```
   Expected: 200 OK with JWT token
 

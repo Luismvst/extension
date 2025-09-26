@@ -48,15 +48,21 @@ export const useAuth = () => {
 
   const login = async (email: string, password: string) => {
     try {
+      console.log('Attempting login for:', email)
       const controller = createTimeoutController(10000) // 10 second timeout
       const response = await api.auth.login(email, password, controller.signal)
       
+      console.log('Login response:', response)
+      
       if (response.data) {
         const token = response.data.access_token
+        console.log('Token received:', token ? 'Yes' : 'No')
         
         localStorage.setItem('token', token)
         
         const decoded = jwtDecode(token) as any
+        console.log('Decoded token:', decoded)
+        
         const newAuthState = {
           user: {
             id: decoded.sub,
@@ -67,6 +73,7 @@ export const useAuth = () => {
           isAuthenticated: true,
         }
         
+        console.log('Setting auth state:', newAuthState)
         setAuthState(newAuthState)
         
         // Store token in a way that can be accessed by other components
@@ -76,9 +83,11 @@ export const useAuth = () => {
         
         return { success: true }
       } else {
+        console.log('No data in response')
         return { success: false, error: 'No se recibió token de autenticación' }
       }
     } catch (error) {
+      console.error('Login error:', error)
       return { success: false, error: handleApiError(error) }
     }
   }

@@ -62,7 +62,7 @@ class MiraklAdapter(MarketplaceAdapter):
             {
                 "order_id": "MIR-001",
                 "marketplace": "mirakl",
-                "status": "SHIPPED",
+                "status": "PENDING",
                 "created_at": "2025-09-19T20:00:00Z",
                 "items": [
                     {
@@ -95,7 +95,7 @@ class MiraklAdapter(MarketplaceAdapter):
             {
                 "order_id": "MIR-002",
                 "marketplace": "mirakl",
-                "status": "SHIPPED",
+                "status": "PENDING",
                 "created_at": "2025-09-19T21:00:00Z",
                 "items": [
                     {
@@ -128,7 +128,7 @@ class MiraklAdapter(MarketplaceAdapter):
             {
                 "order_id": "MIR-003",
                 "marketplace": "mirakl",
-                "status": "SHIPPED",
+                "status": "PENDING",
                 "created_at": "2025-09-19T18:00:00Z",
                 "items": [
                     {
@@ -161,7 +161,7 @@ class MiraklAdapter(MarketplaceAdapter):
             {
                 "order_id": "MIR-004",
                 "marketplace": "mirakl",
-                "status": "SHIPPED",
+                "status": "PENDING",
                 "customer_name": "Ana Martín",
                 "customer_email": "ana.martin@email.com",
                 "weight": 1.5,

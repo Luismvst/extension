@@ -249,7 +249,7 @@ curl -H "Authorization: Bearer <token>" \
 ```bash
 # Login and get token
 curl -X POST -H "Content-Type: application/json" \
-  -d '{"email": "admin@example.com", "password": "password123"}' \
+  -d '{"email": "admin@example.com", "password": "test123"}' \
   "http://localhost:8080/auth/login"
 ```
 

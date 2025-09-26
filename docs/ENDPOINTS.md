@@ -142,7 +142,7 @@ Authenticate user and get JWT token.
 ```json
 {
   "email": "user@example.com",
-  "password": "password123"
+  "password": "test123"
 }
 ```
 
@@ -760,7 +760,7 @@ curl -X GET "http://localhost:8080/api/v1/health"
 # Login
 curl -X POST "http://localhost:8080/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "password123"}'
+  -d '{"email": "test@example.com", "password": "test123"}'
 
 # Get current user (replace <token> with actual token)
 curl -X GET "http://localhost:8080/auth/me" \

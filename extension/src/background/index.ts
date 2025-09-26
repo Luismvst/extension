@@ -60,30 +60,23 @@ chrome.runtime.onMessage.addListener((
 // Handle fetch orders request
 async function handleFetchOrders(payload: any, sendResponse: (response: any) => void) {
   try {
-    // This would typically make an API call to the backend
-    // For now, we'll just return a mock response
-    const mockOrders = [
-      {
-        order_id: 'MIR-001',
-        marketplace: 'mirakl',
-        status: 'SHIPPING',
-        customer_name: 'John Doe',
-        weight: 2.5,
-        total_amount: 45.99
+    // Make API call to the backend
+    const response = await fetch('http://localhost:8080/api/v1/orchestrator/fetch-orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      {
-        order_id: 'MIR-002',
-        marketplace: 'mirakl',
-        status: 'SHIPPING',
-        customer_name: 'Jane Smith',
-        weight: 1.8,
-        total_amount: 32.50
-      }
-    ]
+    })
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    
     sendResponse({
       success: true,
-      data: mockOrders
+      data: data.orders || []
     })
   } catch (error) {
     console.error('Error fetching orders:', error)
@@ -97,28 +90,24 @@ async function handleFetchOrders(payload: any, sendResponse: (response: any) => 
 // Handle create shipments request
 async function handleCreateShipments(payload: any, sendResponse: (response: any) => void) {
   try {
-    // This would typically make an API call to create shipments
-    // For now, we'll just return a mock response
-    const mockShipments = [
-      {
-        order_id: 'MIR-001',
-        shipment_id: 'TIPSA-001',
-        tracking_number: '1Z123456789',
-        status: 'CREATED',
-        label_url: 'https://mock.tipsa.com/label/001'
+    // Make API call to create shipments
+    const response = await fetch('http://localhost:8080/api/v1/orchestrator/post-to-carrier', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      {
-        order_id: 'MIR-002',
-        shipment_id: 'TIPSA-002',
-        tracking_number: '1Z123456790',
-        status: 'CREATED',
-        label_url: 'https://mock.tipsa.com/label/002'
-      }
-    ]
+      body: JSON.stringify({ carrier: 'TIPSA' })
+    })
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    
     sendResponse({
       success: true,
-      data: mockShipments
+      data: data.shipments || []
     })
   } catch (error) {
     console.error('Error creating shipments:', error)

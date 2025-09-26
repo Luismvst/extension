@@ -48,3 +48,4 @@ Write-Host "Backend: http://localhost:8080" -ForegroundColor White
 Write-Host "Extension: extension/dist/" -ForegroundColor White
 
 
+

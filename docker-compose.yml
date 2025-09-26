@@ -1,35 +1,51 @@
+version: '3.8'
+
 services:
+  # Backend API
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    environment:
+      LOG_LEVEL: INFO
+      BACKEND_PORT: 8080
+      MIRAKL_MODE: mock
+      TIPSA_MODE: mock
+      MIRAKL_BASE_URL: http://mirakl-mock:3002
+      TIPSA_BASE_URL: http://tipsa-mock:3001
+      LOG_DIR: /app/logs
+      ORDERS_CSV_PATH: /app/logs/orders_view.csv
+      RUN_TS: ${RUN_TS:-}
     volumes:
       - ./backend/logs:/app/logs
-    environment:
-      - MIRAKL_MODE=mock
-      - TIPSA_MODE=mock
-      - MIRAKL_BASE_URL=http://mirakl-mock:3002
-      - TIPSA_BASE_URL=http://tipsa-mock:3001
-      - LOG_DIR=/app/logs
-      - ORDERS_CSV_PATH=/app/logs/orders_view.csv
-      - RUN_TS=${RUN_TS:-}
     depends_on:
       - tipsa-mock
       - mirakl-mock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mirakl-network
 
+  # Frontend
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=http://localhost:8080
+        - VITE_API_URL=http://backend:8080
     ports:
       - "3000:3000"
     depends_on:
       - backend
+    networks:
+      - mirakl-network
 
+  # TIPSA Mock
   tipsa-mock:
     build:
       context: ./mocks
@@ -37,7 +53,10 @@ services:
     ports:
       - "3001:3001"
     command: python tipsa-mock.py
+    networks:
+      - mirakl-network
 
+  # Mirakl Mock
   mirakl-mock:
     build:
       context: ./mocks
@@ -45,7 +64,10 @@ services:
     ports:
       - "3002:3002"
     command: python mirakl-mock.py
+    networks:
+      - mirakl-network
 
+  # Extension Build
   extension:
     build:
       context: ./extension
@@ -53,7 +75,9 @@ services:
     volumes:
       - ./extension/dist:/app/dist
       - ./extension/out:/app/out
+    networks:
+      - mirakl-network
 
 networks:
-  default:
-    name: extension_net
+  mirakl-network:
+    driver: bridge
