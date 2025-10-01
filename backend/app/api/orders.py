@@ -429,7 +429,7 @@ async def create_test_orders(
         List of created order IDs
     """
     try:
-        from ..models.order import OrderStandard, OrderItem, Buyer, ShippingAddress, Totals
+        from ..models.order import OrderStandard, OrderItem, Buyer, ShippingAddress, OrderTotals
         
         created_orders = []
         
@@ -461,7 +461,8 @@ async def create_test_orders(
                     postal_code="28001",
                     country="ES"
                 ),
-                totals=Totals(
+                totals=OrderTotals(
+                    goods=10.0 + i * 5.0,
                     total=10.0 + i * 5.0,
                     currency="EUR"
                 ),

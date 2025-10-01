@@ -15,4 +15,32 @@
       "order_id": "MIR-001",
       "created_at": "2025-09-19T20:00:00+00:00",
       "status": "SHIPPED",
-      "buyer": 
+      "buyer": {
+        "name": "Juan Perez",
+        "email": "juan@example.com",
+        "phone": "+34123456789"
+      },
+      "shipping": {
+        "name": "Juan Perez",
+        "address1": "Calle Mayor 123",
+        "city": "Madrid",
+        "postcode": "28001",
+        "postal_code": "28001",
+        "country": "ES"
+      },
+      "totals": {
+        "goods": 45.99,
+        "shipping": 0,
+        "currency": "EUR"
+      },
+      "items": [
+        {
+          "sku": "SKU001",
+          "name": "Producto Test",
+          "qty": 1,
+          "unit_price": 45.99
+        }
+      ]
+    }
+  }
+} 

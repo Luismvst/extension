@@ -369,7 +369,6 @@ async def fetch_orders_from_mirakl(
             })
             
             # Log individual order fetch operation
-            print(f"DEBUG: About to log individual order {order_id}")
             try:
                 await csv_ops_logger.log(
                     scope="mirakl",
@@ -380,19 +379,13 @@ async def fetch_orders_from_mirakl(
                     message=f"Order {order_id} fetched from Mirakl",
                     meta={"order_data": order}
                 )
-                print(f"DEBUG: Individual order {order_id} logged successfully")
+                logger.debug(f"Individual order {order_id} logged successfully")
             except Exception as e:
-                print(f"DEBUG: Individual order {order_id} logging failed: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.error(f"Individual order {order_id} logging failed: {e}", exc_info=True)
                 raise
         
         # Log overall operation
         duration_ms = int((time.time() - start_time) * 1000)
-        print(f"DEBUG: About to call csv_ops_logger.log with duration_ms={duration_ms}")
-        print(f"DEBUG: csv_ops_logger type: {type(csv_ops_logger)}")
-        print(f"DEBUG: csv_ops_logger has log method: {hasattr(csv_ops_logger, 'log')}")
-        
         try:
             await csv_ops_logger.log(
                 scope="orchestrator",
@@ -403,12 +396,9 @@ async def fetch_orders_from_mirakl(
                 duration_ms=duration_ms,
                 meta={"orders_count": len(orders)}
             )
-            print("DEBUG: csv_ops_logger.log completed successfully")
+            logger.debug("CSV operations logger completed successfully")
         except Exception as e:
-            print(f"DEBUG: csv_ops_logger.log failed with error: {e}")
-            print(f"DEBUG: Error type: {type(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"CSV operations logging failed: {e}", exc_info=True)
             raise
         
         logger.info(f"fetch_orders_from_mirakl: SUCCESS, Fetched {len(orders)} orders from Mirakl, duration_ms={duration_ms}")

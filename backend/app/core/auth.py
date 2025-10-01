@@ -5,7 +5,7 @@ This module provides JWT-based authentication for the Chrome extension
 and API endpoints.
 """
 
-from jose import jwt
+import jwt
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, Depends
