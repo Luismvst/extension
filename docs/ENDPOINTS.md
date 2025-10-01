@@ -36,7 +36,7 @@ Authorization: Bearer <your-jwt-token>
 - `GET /api/v1/carriers/{carrier}/health` - Get carrier health status ✅
 - `GET /api/v1/carriers/health` - Get all carriers health status ✅
 
-**Available carriers**: `tipsa`, `ontime`, `seur`, `correosex`, `dhl`, `ups`
+**Available carriers**: `tipsa`, `ontime`, `seur`, `correosex`
 
 **✅ Note**: The `/shipments` endpoint now works correctly with proper JSON format and ASCII characters.
 
@@ -186,41 +186,7 @@ Validate JWT token.
 
 ### Carriers (Dynamic Routes)
 
-#### POST /api/v1/carriers/{carrier}/test
-Test endpoint to verify carrier routing works.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Path Parameters:**
-- `carrier`: Carrier code (tipsa, ontime, seur, correosex, dhl, ups)
-
-**Response:**
-```json
-{
-  "success": true,
-  "carrier": "tipsa",
-  "message": "Carrier tipsa endpoint is working",
-  "user": "admin@test.com"
-}
-```
-
-#### POST /api/v1/carriers/{carrier}/shipments-simple
-Simple shipments endpoint without complex validation.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Path Parameters:**
-- `carrier`: Carrier code
-
-**Response:**
-```json
-{
-  "success": true,
-  "carrier": "tipsa",
-  "message": "Simple shipments endpoint working for tipsa",
-  "user": "admin@test.com"
-}
-```
+**Available carriers**: `tipsa`, `ontime`, `seur`, `correosex`
 
 #### POST /api/v1/carriers/{carrier}/shipments
 Create shipments for any carrier.
@@ -228,7 +194,7 @@ Create shipments for any carrier.
 **Headers:** `Authorization: Bearer <token>`
 
 **Path Parameters:**
-- `carrier`: Carrier code (tipsa, ontime, seur, correosex, dhl, ups)
+- `carrier`: Carrier code (tipsa, ontime, seur, correosex)
 
 **Request Body:**
 ```json
@@ -260,15 +226,15 @@ Create shipments for any carrier.
   "success": true,
   "carrier": "tipsa",
   "total_orders": 1,
-  "successful_jobs": 1,
-  "failed_jobs": 0,
+  "successful_shipments": 1,
+  "failed_shipments": 0,
   "jobs": [
     {
       "order_id": "MIR-001",
+      "expedition_id": "TIPSA-MIR-001-12345",
       "status": "CREATED",
-      "tracking_number": "TRK123456789",
-      "expedition_id": "EXP001",
-      "carrier_reference": "TIPS001"
+      "carrier": "tipsa",
+      "created_at": "2025-01-15T10:00:00"
     }
   ]
 }
@@ -310,6 +276,8 @@ Get shipment status for a specific expedition.
 
 #### POST /api/v1/carriers/webhooks/{carrier}
 Receive webhook notifications from carriers.
+
+**⚠️ Note:** This endpoint does NOT require authentication (webhooks come from external carriers).
 
 **Path Parameters:**
 - `carrier`: Carrier code
@@ -721,8 +689,8 @@ The API supports CORS for the following origins:
 
 ## Webhook Endpoints
 
-### POST /api/v1/carriers/tipsa/webhook
-TIPSA webhook endpoint for tracking updates.
+### POST /api/v1/carriers/webhooks/{carrier}
+Carrier webhook endpoint for tracking updates from any carrier (TIPSA, OnTime, SEUR, Correos Express).
 
 **Request Body:**
 ```json
@@ -819,9 +787,11 @@ curl -X GET "http://localhost:8080/api/v1/carriers/tipsa/health" \
 
 ### Webhook Testing
 ```bash
-# TIPSA webhook
+# TIPSA webhook (with signature validation)
 curl -X POST "http://localhost:8080/api/v1/carriers/webhooks/tipsa" \
   -H "Content-Type: application/json" \
+  -H "X-Signature: generated_hmac_signature" \
+  -H "X-Timestamp: 2025-01-01T12:00:00Z" \
   -d '{
     "event_type": "shipment_update",
     "expedition_id": "TIPSA-MIR-0013852",
@@ -830,6 +800,17 @@ curl -X POST "http://localhost:8080/api/v1/carriers/webhooks/tipsa" \
     "timestamp": "2025-01-01T12:00:00Z",
     "location": "Madrid, Spain",
     "description": "Package in transit"
+  }'
+
+# OnTime webhook
+curl -X POST "http://localhost:8080/api/v1/carriers/webhooks/ontime" \
+  -H "Content-Type: application/json" \
+  -H "X-Signature: generated_hmac_signature" \
+  -H "X-Timestamp: 2025-01-01T12:00:00Z" \
+  -d '{
+    "event_type": "shipment_update",
+    "expedition_id": "ONTIME-MIR-001-12345",
+    "status": "DELIVERED"
   }'
 ```
 

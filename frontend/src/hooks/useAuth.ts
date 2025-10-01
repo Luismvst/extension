@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { jwtDecode } from 'jwt-decode'
 import { api, createTimeoutController, handleApiError } from '../lib/api'
 
@@ -21,7 +21,7 @@ export const useAuth = () => {
     isAuthenticated: false,
   })
 
-  useEffect(() => {
+  const checkAuthStatus = useCallback(() => {
     // Check for existing token in localStorage
     const token = localStorage.getItem('token')
     if (token) {
@@ -37,14 +37,32 @@ export const useAuth = () => {
             token,
             isAuthenticated: true,
           })
+          return true
         } else {
           localStorage.removeItem('token')
+          setAuthState({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          })
+          return false
         }
       } catch (error) {
         localStorage.removeItem('token')
+        setAuthState({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+        })
+        return false
       }
     }
+    return false
   }, [])
+
+  useEffect(() => {
+    checkAuthStatus()
+  }, [checkAuthStatus])
 
   const login = async (email: string, password: string) => {
     try {
@@ -80,6 +98,11 @@ export const useAuth = () => {
         if (typeof window !== 'undefined') {
           (window as any).__authToken = token
         }
+        
+        // Force re-check of auth status
+        setTimeout(() => {
+          checkAuthStatus()
+        }, 50)
         
         return { success: true }
       } else {

@@ -271,12 +271,11 @@ curl -H "Authorization: Bearer <token>" \
 
 ### Health Checks
 ```bash
-# Check system health
-curl "http://localhost:8080/api/v1/health"
+# Check basic system health
+curl "http://localhost:8080/api/v1/health/"
 
-# Check specific service
-curl "http://localhost:8080/api/v1/health/mirakl"
-curl "http://localhost:8080/api/v1/health/tipsa"
+# Check detailed health (includes all services)
+curl "http://localhost:8080/api/v1/health/detailed"
 ```
 
 ### System Status

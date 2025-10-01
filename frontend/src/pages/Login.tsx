@@ -37,7 +37,10 @@ const Login: React.FC = () => {
     const result = await login(formData.email, formData.password)
     
     if (result.success) {
-      navigate('/dashboard')
+      // Force navigation after successful login
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true })
+      }, 100)
     } else {
       setError(result.error || 'Error de autenticación')
     }

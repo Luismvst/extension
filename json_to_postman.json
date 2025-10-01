@@ -1,0 +1,1040 @@
+{
+  "info": {
+    "name": "Mirakl‑TIPSA Orchestrator API (Updated)",
+    "_postman_id": "mt-1759171601",
+    "description": "Updated collection with all current endpoints from the backend code. Variables: {{baseUrl}}, {{token}}, {{carrier}}, {{expedition_id}}, {{order_id}}, {{webhook_secret}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "carrier",
+      "value": "tipsa"
+    },
+    {
+      "key": "expedition_id",
+      "value": "EXP001"
+    },
+    {
+      "key": "order_id",
+      "value": "MIR-001"
+    },
+    {
+      "key": "webhook_secret",
+      "value": "tipsa_webhook_secret_2025"
+    },
+    {
+      "key": "computed_signature",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Validate ASCII-only body and ISO8601 without 'Z' if body exists",
+          "const req = pm.request;",
+          "if (req.body && req.body.mode === 'raw' && typeof req.body.raw === 'string' && req.body.raw.length) {",
+          "  const raw = req.body.raw;",
+          "  // ASCII check",
+          "  for (let i=0;i<raw.length;i++){",
+          "    if (raw.charCodeAt(i) > 127){",
+          "      console.warn('Non-ASCII character detected at position', i);",
+          "      break;",
+          "    }",
+          "  }",
+          "  // ISO 8601 without Z check (simple heuristic)",
+          "  const datePattern = /(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2})(Z?)/g;",
+          "  let m;",
+          "  while ((m = datePattern.exec(raw)) !== null){",
+          "    if (m[2] === 'Z'){",
+          "      console.warn('Date with Z detected, expected without Z:', m[0]);",
+          "    }",
+          "  }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Root",
+      "item": [
+        {
+          "name": "GET /api/v1/health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has status', ()=> pm.expect(pm.response.json()).to.have.property('status'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/health/detailed",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/health/detailed"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has dependencies', ()=> pm.expect(pm.response.json()).to.have.property('dependencies'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has version', ()=> pm.expect(pm.response.json()).to.have.property('version'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"test@example.com\", \"password\": \"test123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login 200', ()=> pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('access_token present', ()=> pm.expect(data).to.have.property('access_token'));",
+                  "pm.collectionVariables.set('token', data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('has email', ()=> pm.expect(pm.response.json()).to.have.property('email'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/validate",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/validate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('valid boolean', ()=> pm.expect(pm.response.json()).to.have.property('valid'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/refresh",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('access_token present', ()=> pm.expect(data).to.have.property('access_token'));",
+                  "pm.collectionVariables.set('token', data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/extension-token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/extension-token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('access_token present', ()=> pm.expect(data).to.have.property('access_token'));",
+                  "pm.collectionVariables.set('token', data.access_token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Marketplaces (Mirakl)",
+      "item": [
+        {
+          "name": "GET /api/v1/marketplaces/mirakl/orders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplaces/mirakl/orders?status=SHIPPING&limit=100&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "marketplaces", "mirakl", "orders"],
+              "query": [
+                {"key": "status", "value": "SHIPPING"},
+                {"key": "limit", "value": "100"},
+                {"key": "offset", "value": "0"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/marketplaces/mirakl/orders/:order_id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplaces/mirakl/orders/{{order_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "marketplaces", "mirakl", "orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "PUT /api/v1/marketplaces/mirakl/orders/:order_id/tracking",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplaces/mirakl/orders/{{order_id}}/tracking",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "marketplaces", "mirakl", "orders", "{{order_id}}", "tracking"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"tracking_number\": \"TRK123456789\", \"carrier_code\": \"tipsa\", \"carrier_name\": \"TIPSA\"}"
+            }
+          }
+        },
+        {
+          "name": "PUT /api/v1/marketplaces/mirakl/orders/:order_id/status",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplaces/mirakl/orders/{{order_id}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "marketplaces", "mirakl", "orders", "{{order_id}}", "status"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"SHIPPED\", \"reason\": \"Order shipped successfully\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Carriers",
+      "item": [
+        {
+          "name": "POST /api/v1/carriers/:carrier/shipments",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/carriers/{{carrier}}/shipments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "carriers", "{{carrier}}", "shipments"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"orders\": [{\"order_id\": \"MIR-001\", \"created_at\": \"2025-01-01T10:00:00\", \"status\": \"PENDING\", \"items\": [{\"sku\": \"SKU001\", \"name\": \"Producto Test\", \"qty\": 1, \"unit_price\": 45.99}], \"buyer\": {\"name\": \"Juan Perez\", \"email\": \"juan@example.com\"}, \"shipping\": {\"name\": \"Juan Perez\", \"address1\": \"Calle Mayor 123\", \"city\": \"Madrid\", \"postcode\": \"28001\", \"country\": \"ES\"}, \"totals\": {\"goods\": 45.99, \"shipping\": 0}}], \"carrier\": \"{{carrier}}\", \"service\": \"ESTANDAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has jobs', ()=> { const j=pm.response.json(); pm.expect(j.jobs).to.exist; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/carriers/:carrier/shipments/:expedition_id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/carriers/{{carrier}}/shipments/{{expedition_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "carriers", "{{carrier}}", "shipments", "{{expedition_id}}"]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/carriers/webhooks/:carrier (signed)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/carriers/webhooks/{{carrier}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "carriers", "webhooks", "{{carrier}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Signature",
+                "value": "<computed at runtime>"
+              },
+              {
+                "key": "X-Timestamp",
+                "value": "{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"expedition_id\": \"EXP001\", \"tracking_number\": \"TRK123456789\", \"status\": \"DELIVERED\", \"timestamp\": \"2025-01-01T14:00:00\", \"location\": \"Madrid, Spain\", \"description\": \"Package delivered successfully\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.request.body.raw;",
+                  "const secret = pm.collectionVariables.get('webhook_secret');",
+                  "const CryptoJS = require('crypto-js');",
+                  "const sig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Base64);",
+                  "pm.request.headers.upsert({key:'X-Signature', value: sig});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/carriers/:carrier/health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/carriers/{{carrier}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "carriers", "{{carrier}}", "health"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/carriers/health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/carriers/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orchestrator",
+      "item": [
+        {
+          "name": "POST /api/v1/orchestrator/load-orders",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/orchestrator/load-orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orchestrator/upload-tracking",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/orchestrator/upload-tracking",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[{\"order_id\": \"MIR-001\", \"tracking_number\": \"TRK123456789\", \"carrier_code\": \"tipsa\", \"carrier_name\": \"TIPSA\"}]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/orchestrator/status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/orchestrator/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has status', ()=> pm.expect(pm.response.json()).to.have.property('status'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orchestrator/fetch-orders",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/orchestrator/fetch-orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orchestrator/refresh-marketplace",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orchestrator/refresh-marketplace?marketplace=mirakl",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orchestrator", "refresh-marketplace"],
+              "query": [
+                {"key": "marketplace", "value": "mirakl"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orchestrator/post-to-carrier",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orchestrator/post-to-carrier?carrier={{carrier}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orchestrator", "post-to-carrier"],
+              "query": [
+                {"key": "carrier", "value": "{{carrier}}"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orchestrator/push-tracking-to-mirakl",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/orchestrator/push-tracking-to-mirakl"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/orchestrator/orders-view",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orchestrator/orders-view?state=&carrier=&limit=100&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orchestrator", "orders-view"],
+              "query": [
+                {"key": "state", "value": ""},
+                {"key": "carrier", "value": ""},
+                {"key": "limit", "value": "100"},
+                {"key": "offset", "value": "0"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "GET /api/v1/orders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders?estado_mirakl=&estado_tipsa=&limit=100&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"],
+              "query": [
+                {"key": "estado_mirakl", "value": ""},
+                {"key": "estado_tipsa", "value": ""},
+                {"key": "limit", "value": "100"},
+                {"key": "offset", "value": "0"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/orders/:order_id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{order_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{order_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 or 404', ()=> pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orders",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/orders",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"order_id\": \"MIR-001\", \"created_at\": \"2025-01-01T10:00:00\", \"status\": \"PENDING\", \"items\": [{\"sku\": \"SKU001\", \"name\": \"Producto Test\", \"qty\": 1, \"unit_price\": 45.99}], \"buyer\": {\"name\": \"Juan Perez\", \"email\": \"juan@example.com\"}, \"shipping\": {\"name\": \"Juan Perez\", \"address1\": \"Calle Mayor 123\", \"city\": \"Madrid\", \"postcode\": \"28001\", \"country\": \"ES\"}, \"totals\": {\"goods\": 45.99, \"shipping\": 0}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/v1/orders/:order_id",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{order_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{order_id}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"order_id\": \"{{order_id}}\", \"estado_tipsa\": \"SENT\", \"tracking_number\": \"TRK123456789\", \"carrier_code\": \"tipsa\", \"carrier_name\": \"TIPSA\", \"synced_to_carrier\": true}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 or 404', ()=> pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/v1/orders/:order_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{order_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{order_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 or 404', ()=> pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/orders/summary/stats",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/orders/summary/stats"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orders/fetch-from-mirakl",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/fetch-from-mirakl?status=PENDING&limit=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "fetch-from-mirakl"],
+              "query": [
+                {"key": "status", "value": "PENDING"},
+                {"key": "limit", "value": "100"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/orders/export/csv",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/export/csv?estado_mirakl=&estado_tipsa=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "export", "csv"],
+              "query": [
+                {"key": "estado_mirakl", "value": ""},
+                {"key": "estado_tipsa", "value": ""}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Content-Type CSV', ()=> pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/orders/create-test-orders",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/create-test-orders?count=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "create-test-orders"],
+              "query": [
+                {"key": "count", "value": "3"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', ()=> pm.expect(pm.response.code).to.be.within(200,299));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Logs & Exports",
+      "item": [
+        {
+          "name": "GET /api/v1/logs/operations",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/logs/operations?limit=100&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "logs", "operations"],
+              "query": [
+                {"key": "limit", "value": "100"},
+                {"key": "offset", "value": "0"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/logs/orders-view",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/logs/orders-view?state=&carrier=&limit=100&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "logs", "orders-view"],
+              "query": [
+                {"key": "state", "value": ""},
+                {"key": "carrier", "value": ""},
+                {"key": "limit", "value": "100"},
+                {"key": "offset", "value": "0"}
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/logs/exports/operations.csv",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/logs/exports/operations.csv"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Content-Type CSV', ()=> pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/logs/exports/orders-view.csv",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/logs/exports/orders-view.csv"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Content-Type CSV', ()=> pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/logs/exports/json-dumps",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/logs/exports/json-dumps"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('Has success', ()=> pm.expect(pm.response.json()).to.have.property('success'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/logs/exports/json-dumps/:filename",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/logs/exports/json-dumps/example.json",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "logs", "exports", "json-dumps", "example.json"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 or 404', ()=> pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/logs/stats",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/logs/stats"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', ()=> pm.response.to.have.status(200));",
+                  "pm.test('has stats', ()=> pm.expect(pm.response.json()).to.have.property('stats'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

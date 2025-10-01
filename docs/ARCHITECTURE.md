@@ -48,11 +48,17 @@ graph TD
 
 ### 2. Backend FastAPI (Opcional en MVP)
 
-#### API Endpoints
-- `GET /health` → Status del servicio
-- `POST /map/tipsa` → OrderStandard[] → CSV TIPSA
-- `POST /ship/tipsa` → Stub para futura integración API TIPSA
-- `POST /tracking/mirakl` → Stub para futura integración OR23
+#### API Endpoints (Active)
+- `GET /api/v1/health/` → Basic health check
+- `GET /api/v1/health/detailed` → Detailed health status
+- `POST /api/v1/orchestrator/fetch-orders` → Fetch orders from Mirakl
+- `POST /api/v1/orchestrator/post-to-carrier` → Send orders to carrier
+- `POST /api/v1/orchestrator/push-tracking-to-mirakl` → Update tracking in Mirakl
+- `POST /api/v1/carriers/{carrier}/shipments` → Create carrier shipments
+- `GET /api/v1/logs/operations` → Get operations logs
+- `GET /api/v1/logs/exports/operations.csv` → Export operations CSV
+
+**Note:** Client-side mapping (OrderStandard → CSV TIPSA) is handled in the browser extension, not via backend API.
 
 #### Core Services
 - **`app/core/settings.py`**: Configuración con Pydantic Settings
