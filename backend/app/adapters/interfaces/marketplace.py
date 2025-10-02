@@ -13,7 +13,7 @@ class MarketplaceAdapter(ABC):
     """Abstract base class for marketplace adapters."""
     
     @abstractmethod
-    async def get_orders(self, status: str = "SHIPPING", 
+    async def get_orders(self, status: str = "PENDING", 
                         limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """
         Get orders from marketplace.

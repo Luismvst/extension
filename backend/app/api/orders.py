@@ -425,7 +425,7 @@ async def create_test_orders(
                 order_id=order_id,
                 reference=order_id,
                 created_at=datetime.now(),
-                status="SHIPPING",
+                status="PENDING",
                 recipient_name=f"Test Customer {i+1}",
                 recipient_address=f"Test Street {i+1}",
                 recipient_city="Madrid",

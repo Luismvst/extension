@@ -296,7 +296,7 @@ class MiraklAdapter(MarketplaceAdapter):
         mock_details = {
             "order_id": order_id,
             "marketplace": "mirakl",
-            "status": "SHIPPING",
+            "status": "PENDING",
             "customer_name": "Juan Pérez",
             "customer_email": "juan.perez@email.com",
             "weight": 2.5,

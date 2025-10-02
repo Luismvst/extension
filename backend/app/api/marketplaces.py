@@ -25,7 +25,7 @@ mirakl_adapter = MiraklAdapter()
 
 @router.get("/mirakl/orders")
 async def get_mirakl_orders(
-    status: str = "SHIPPING", # pendientes de aceptación -> TODO adaptar esto
+    status: str = "PENDING", # pendientes de aceptación -> TODO adaptar esto
     limit: int = 100,
     offset: int = 0,
     current_user: Dict[str, Any] = Depends(get_current_user)
@@ -34,7 +34,7 @@ async def get_mirakl_orders(
     Get orders from Mirakl marketplace.
     
     Args:
-        status: Order status filter (default: SHIPPING)
+        status: Order status filter (default: PENDING)
         limit: Maximum number of orders to return (default: 100)
         offset: Number of orders to skip (default: 0)
         current_user: Authenticated user (from JWT)
