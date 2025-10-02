@@ -564,19 +564,19 @@ async def post_to_carrier(
             order = order_storage.order_data
             order_data.append({
                 "order_id": order.order_id,
-                "customer_name": order.buyer.name,
-                "customer_email": order.buyer.email,
-                "weight": sum(item.weight_kg or 0 for item in order.items),
-                "total_amount": float(order.totals.total),
-                "currency": order.totals.currency,
+                "customer_name": order.recipient_name,
+                "customer_email": order.recipient_email,
+                "weight": float(order.weight_kg or 0.1),
+                "total_amount": float(order.cash_on_delivery or 0),
+                "currency": "EUR",
                 "shipping_address": {
-                    "name": order.shipping.name,
-                    "address1": order.shipping.address1,
-                    "address2": order.shipping.address2,
-                    "city": order.shipping.city,
-                    "state": order.shipping.state,
-                    "postal_code": order.shipping.postal_code,
-                    "country": order.shipping.country
+                    "name": order.recipient_name,
+                    "address1": order.recipient_address,
+                    "address2": "",
+                    "city": order.recipient_city,
+                    "state": "",
+                    "postal_code": order.recipient_postal_code,
+                    "country": order.recipient_country
                 }
             })
         

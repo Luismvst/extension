@@ -11,6 +11,7 @@ from datetime import datetime
 
 from ..interfaces.marketplace import MarketplaceAdapter
 from ...core.settings import settings
+from ...models.order import OrderStandard
 import logging
 
 # Create logger for this module
@@ -55,141 +56,191 @@ class MiraklAdapter(MarketplaceAdapter):
         
         return await self._get_orders_real(status, limit, offset)
     
+    def _convert_mirakl_to_order_standard(self, mirakl_product: Dict[str, Any]) -> OrderStandard:
+        """
+        Convert Mirakl product data to OrderStandard format
+        
+        Args:
+            mirakl_product: Raw Mirakl product data
+            
+        Returns:
+            OrderStandard object
+        """
+        return OrderStandard(
+            # Core identification
+            order_id=mirakl_product.get("Referencia", ""),  # Use reference as order_id for now
+            reference=mirakl_product.get("Referencia", ""),
+            created_at=datetime.now(),
+            status="PENDING",
+            
+            # Recipient information
+            recipient_name=mirakl_product.get("Nombre Consignatario", ""),
+            recipient_address=mirakl_product.get("Dirección Consignatario", ""),
+            recipient_city=mirakl_product.get("Poblacion Consignatario", ""),
+            recipient_postal_code=mirakl_product.get("Código Postal Consignatario", ""),
+            recipient_country=mirakl_product.get("País del Consignatario", "ES"),
+            recipient_contact=mirakl_product.get("Contacto Consignatario", ""),
+            recipient_phone=mirakl_product.get("Teléfono Consignatario", ""),
+            recipient_email=mirakl_product.get("Email Destino", ""),
+            recipient_tax_id=mirakl_product.get("Nif Consignatario", ""),
+            
+            # Package information
+            packages=mirakl_product.get("Bultos", "1"),
+            weight_kg=mirakl_product.get("Kilos", "0.1"),
+            volume=mirakl_product.get("Volumen", ""),
+            package_type=mirakl_product.get("Tipo Bultos", ""),
+            
+            # Product information
+            product_name=mirakl_product.get("Producto", ""),
+            shipping_cost=mirakl_product.get("Portes", "0.00"),
+            cash_on_delivery=mirakl_product.get("Reembolso", "0.00"),
+            
+            # Customer information
+            customer_name=mirakl_product.get("Nombre Cliente", ""),
+            customer_code=mirakl_product.get("Código Cliente", ""),
+            customer_department=mirakl_product.get("Departamento Cliente", ""),
+            
+            # Additional fields
+            observations=mirakl_product.get("Observaciones1", ""),
+            deferred_date=mirakl_product.get("Fecha Aplazada", ""),
+            return_flag=mirakl_product.get("Retorno", "N"),
+            return_confirmation=mirakl_product.get("Devolución Conforme", "N"),
+            multi_reference=mirakl_product.get("Multireferencia", ""),
+            date=mirakl_product.get("Fecha", "")
+        )
+    
+    
+    
     async def _get_orders_mock(self, status: str, limit: int, offset: int) -> Dict[str, Any]:
-        """Mock implementation of get_orders."""
-        # Mock orders data with different statuses
-        mock_orders = [
+        """Mock implementation of get_orders with Mirakl product columns."""
+        # Mock Mirakl product data with specific columns
+        mock_mirakl_products = [
             {
-                "order_id": "MIR-001",
-                "marketplace": "mirakl",
-                "status": "PENDING",
-                "created_at": "2025-09-19T20:00:00Z",
-                "items": [
-                    {
-                        "sku": "SKU-001",
-                        "name": "Producto Test 1",
-                        "qty": 2,
-                        "unit_price": 22.99,
-                        "weight_kg": 1.5
-                    }
-                ],
-                "buyer": {
-                    "name": "Juan Pérez",
-                    "email": "juan.perez@email.com",
-                    "phone": "+34612345678"
-                },
-                "shipping": {
-                    "name": "Juan Pérez",
-                    "address1": "Calle Mayor 123",
-                    "city": "Madrid",
-                    "postal_code": "28001",
-                    "country": "ES"
-                },
-                "totals": {
-                    "goods": 45.98,
-                    "shipping": 0.0,
-                    "total": 45.98,
-                    "currency": "EUR"
-                }
+                "Referencia": "MIR-001",
+                "Nombre Consignatario": "Juan Pérez",
+                "Dirección Consignatario": "Calle Mayor 123",
+                "Poblacion Consignatario": "Madrid",
+                "Código Postal Consignatario": "28001",
+                "País del Consignatario": "ES",
+                "Contacto Consignatario": "Juan Pérez",
+                "Teléfono Consignatario": "+34612345678",
+                "Bultos": "1",
+                "Kilos": "1.5",
+                "Volumen": "0.01",
+                "Portes": "0.00",
+                "Producto": "Producto Test 1",
+                "Reembolso": "0.00",
+                "Fecha Aplazada": "",
+                "Observaciones1": "Envío estándar",
+                "Email Destino": "juan.perez@email.com",
+                "Tipo Bultos": "Paquete",
+                "Departamento Cliente": "Ventas",
+                "Devolución Conforme": "N",
+                "Fecha": "2025-09-19",
+                "Nif Consignatario": "",
+                "Nombre Cliente": "Juan Pérez",
+                "Retorno": "N",
+                "Código Cliente": "CLI-001",
+                "Multireferencia": "MIR-001-REF"
             },
             {
-                "order_id": "MIR-002",
-                "marketplace": "mirakl",
-                "status": "PENDING",
-                "created_at": "2025-09-19T21:00:00Z",
-                "items": [
-                    {
-                        "sku": "SKU-002",
-                        "name": "Producto Test 2",
-                        "qty": 1,
-                        "unit_price": 32.50,
-                        "weight_kg": 0.8
-                    }
-                ],
-                "buyer": {
-                    "name": "María García",
-                    "email": "maria.garcia@email.com",
-                    "phone": "+34687654321"
-                },
-                "shipping": {
-                    "name": "María García",
-                    "address1": "Avenida de la Paz 456",
-                    "city": "Barcelona",
-                    "postal_code": "08001",
-                    "country": "ES"
-                },
-                "totals": {
-                    "goods": 32.50,
-                    "shipping": 0.0,
-                    "total": 32.50,
-                    "currency": "EUR"
-                }
+                "Referencia": "MIR-002",
+                "Nombre Consignatario": "María García",
+                "Dirección Consignatario": "Avenida de la Paz 456",
+                "Poblacion Consignatario": "Barcelona",
+                "Código Postal Consignatario": "08001",
+                "País del Consignatario": "ES",
+                "Contacto Consignatario": "María García",
+                "Teléfono Consignatario": "+34687654321",
+                "Bultos": "1",
+                "Kilos": "0.8",
+                "Volumen": "0.005",
+                "Portes": "0.00",
+                "Producto": "Producto Test 2",
+                "Reembolso": "0.00",
+                "Fecha Aplazada": "",
+                "Observaciones1": "Entrega urgente",
+                "Email Destino": "maria.garcia@email.com",
+                "Tipo Bultos": "Sobre",
+                "Departamento Cliente": "Ventas",
+                "Devolución Conforme": "N",
+                "Fecha": "2025-09-19",
+                "Nif Consignatario": "",
+                "Nombre Cliente": "María García",
+                "Retorno": "N",
+                "Código Cliente": "CLI-002",
+                "Multireferencia": "MIR-002-REF"
             },
             {
-                "order_id": "MIR-003",
-                "marketplace": "mirakl",
-                "status": "PENDING",
-                "created_at": "2025-09-19T18:00:00Z",
-                "items": [
-                    {
-                        "sku": "SKU-003",
-                        "name": "Producto Test 3",
-                        "qty": 3,
-                        "unit_price": 22.60,
-                        "weight_kg": 2.0
-                    }
-                ],
-                "buyer": {
-                    "name": "Carlos López",
-                    "email": "carlos.lopez@email.com",
-                    "phone": "+34987654321"
-                },
-                "shipping": {
-                    "name": "Carlos López",
-                    "address1": "Plaza España 789",
-                    "city": "Valencia",
-                    "postal_code": "46001",
-                    "country": "ES"
-                },
-                "totals": {
-                    "goods": 67.80,
-                    "shipping": 0.0,
-                    "total": 67.80,
-                    "currency": "EUR"
-                }
+                "Referencia": "MIR-003",
+                "Nombre Consignatario": "Carlos López",
+                "Dirección Consignatario": "Plaza España 789",
+                "Poblacion Consignatario": "Valencia",
+                "Código Postal Consignatario": "46001",
+                "País del Consignatario": "ES",
+                "Contacto Consignatario": "Carlos López",
+                "Teléfono Consignatario": "+34987654321",
+                "Bultos": "3",
+                "Kilos": "2.0",
+                "Volumen": "0.02",
+                "Portes": "0.00",
+                "Producto": "Producto Test 3",
+                "Reembolso": "0.00",
+                "Fecha Aplazada": "",
+                "Observaciones1": "Múltiples unidades",
+                "Email Destino": "carlos.lopez@email.com",
+                "Tipo Bultos": "Caja",
+                "Departamento Cliente": "Ventas",
+                "Devolución Conforme": "N",
+                "Fecha": "2025-09-19",
+                "Nif Consignatario": "",
+                "Nombre Cliente": "Carlos López",
+                "Retorno": "N",
+                "Código Cliente": "CLI-003",
+                "Multireferencia": "MIR-003-REF"
             },
             {
-                "order_id": "MIR-004",
-                "marketplace": "mirakl",
-                "status": "PENDING",
-                "customer_name": "Ana Martín",
-                "customer_email": "ana.martin@email.com",
-                "weight": 1.5,
-                "total_amount": 28.90,
-                "currency": "EUR",
-                "created_at": "2025-09-19T16:00:00Z",
-                "shipping_address": {
-                    "name": "Ana Martín",
-                    "street": "Calle del Sol 321",
-                    "city": "Sevilla",
-                    "postal_code": "41001",
-                    "country": "ES"
-                }
+                "Referencia": "MIR-004",
+                "Nombre Consignatario": "Ana Martín",
+                "Dirección Consignatario": "Calle del Sol 321",
+                "Poblacion Consignatario": "Sevilla",
+                "Código Postal Consignatario": "41001",
+                "País del Consignatario": "ES",
+                "Contacto Consignatario": "Ana Martín",
+                "Teléfono Consignatario": "+34654321098",
+                "Bultos": "1",
+                "Kilos": "1.5",
+                "Volumen": "0.008",
+                "Portes": "0.00",
+                "Producto": "Producto Test 4",
+                "Reembolso": "28.90",
+                "Fecha Aplazada": "",
+                "Observaciones1": "Reembolso incluido",
+                "Email Destino": "ana.martin@email.com",
+                "Tipo Bultos": "Paquete",
+                "Departamento Cliente": "Ventas",
+                "Devolución Conforme": "N",
+                "Fecha": "2025-09-19",
+                "Nif Consignatario": "12345678A",
+                "Nombre Cliente": "Ana Martín",
+                "Retorno": "N",
+                "Código Cliente": "CLI-004",
+                "Multireferencia": "MIR-004-REF"
             }
         ]
         
-        # Filter by status - only show PENDING and PENDING_APPROVAL orders
-        if status in ["PENDING", "PENDING_APPROVAL"]:
-            filtered_orders = [order for order in mock_orders if order["status"] in ["PENDING", "PENDING_APPROVAL"]]
-        else:
-            filtered_orders = [order for order in mock_orders if order["status"] == status]
+        # Convert Mirakl products to OrderStandard format
+        orders = []
+        for mirakl_product in mock_mirakl_products:
+            order_standard = self._convert_mirakl_to_order_standard(mirakl_product)
+            orders.append(order_standard.dict())
         
         # Apply pagination
-        paginated_orders = filtered_orders[offset:offset + limit]
+        paginated_orders = orders[offset:offset + limit]
         
         result = {
             "orders": paginated_orders,
-            "total": len(filtered_orders),
+            "total": len(orders),
             "limit": limit,
             "offset": offset
         }

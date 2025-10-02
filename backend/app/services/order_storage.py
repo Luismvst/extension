@@ -45,36 +45,11 @@ class OrderStorageService:
         try:
             data = {}
             for order_id, order in self.orders.items():
-                # Build order dict manually to avoid Pydantic dict() issues
-                order_dict = {
-                    "order_id": order.order_id,
-                    "created_at": order.created_at.isoformat(),
-                    "updated_at": order.updated_at.isoformat(),
-                    "estado_mirakl": order.estado_mirakl,
-                    "estado_tipsa": order.estado_tipsa,
-                    "tracking_number": order.tracking_number,
-                    "carrier_code": order.carrier_code,
-                    "carrier_name": order.carrier_name,
-                    "synced_to_mirakl": order.synced_to_mirakl,
-                    "synced_to_carrier": order.synced_to_carrier,
-                    "notes": order.notes,
-                    "order_data": {
-                        "order_id": order.order_data.order_id,
-                        "created_at": order.order_data.created_at.isoformat(),
-                        "status": order.order_data.status,
-                        "buyer": order.order_data.buyer,
-                        "shipping": order.order_data.shipping,
-                        "totals": order.order_data.totals,
-                        "items": order.order_data.items,
-                        "estado_mirakl": order.order_data.estado_mirakl,
-                        "estado_tipsa": order.order_data.estado_tipsa,
-                        "tracking_number": order.order_data.tracking_number,
-                        "carrier_code": order.order_data.carrier_code,
-                        "carrier_name": order.order_data.carrier_name,
-                        "synced_to_mirakl": order.order_data.synced_to_mirakl,
-                        "synced_to_carrier": order.order_data.synced_to_carrier
-                    }
-                }
+                # Convert to dict and handle datetime serialization
+                order_dict = order.dict()
+                order_dict["created_at"] = order.created_at.isoformat()
+                order_dict["updated_at"] = order.updated_at.isoformat()
+                order_dict["order_data"]["created_at"] = order.order_data.created_at.isoformat()
                 data[order_id] = order_dict
             
             with open(self.storage_file, 'w', encoding='utf-8') as f:
@@ -91,8 +66,8 @@ class OrderStorageService:
             existing = self.orders[order.order_id]
             existing.order_data = order
             existing.updated_at = now
-            existing.estado_mirakl = order.estado_mirakl or existing.estado_mirakl
-            existing.estado_tipsa = order.estado_tipsa or existing.estado_tipsa
+            existing.estado_mirakl = order.mirakl_status or existing.estado_mirakl
+            existing.estado_tipsa = order.tipsa_status or existing.estado_tipsa
             existing.tracking_number = order.tracking_number or existing.tracking_number
             existing.carrier_code = order.carrier_code or existing.carrier_code
             existing.carrier_name = order.carrier_name or existing.carrier_name
@@ -105,8 +80,8 @@ class OrderStorageService:
                 order_data=order,
                 created_at=now,
                 updated_at=now,
-                estado_mirakl=order.estado_mirakl or "PENDING",
-                estado_tipsa=order.estado_tipsa or "PENDING",
+                estado_mirakl=order.mirakl_status or "PENDING",
+                estado_tipsa=order.tipsa_status or "PENDING",
                 tracking_number=order.tracking_number,
                 carrier_code=order.carrier_code,
                 carrier_name=order.carrier_name,

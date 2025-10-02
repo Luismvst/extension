@@ -74,15 +74,7 @@ async def get_orders(
                 "synced_to_mirakl": order.synced_to_mirakl,
                 "synced_to_carrier": order.synced_to_carrier,
                 "notes": order.notes,
-                "order_data": {
-                    "order_id": order.order_data.order_id,
-                    "created_at": order.order_data.created_at.isoformat(),
-                    "status": order.order_data.status,
-                    "buyer": order.order_data.buyer,
-                    "shipping": order.order_data.shipping,
-                    "totals": order.order_data.totals,
-                    "items": order.order_data.items
-                }
+                "order_data": order.order_data.dict()
             }
             orders_data.append(order_dict)
         
@@ -303,28 +295,20 @@ async def fetch_orders_from_mirakl(
                 # Convert to OrderStandard format
                 order = OrderStandard(
                     order_id=order_data.get("order_id"),
+                    reference=order_data.get("order_id"),  # Use order_id as reference for now
                     created_at=datetime.fromisoformat(order_data.get("created_at", datetime.utcnow().isoformat())),
                     status=order_data.get("status", "PENDING"),
-                    items=[],  # TODO: Parse items from order_data
-                    buyer={
-                        "name": order_data.get("customer_name", ""),
-                        "email": order_data.get("customer_email"),
-                        "phone": order_data.get("customer_phone")
-                    },
-                    shipping={
-                        "name": order_data.get("customer_name", ""),
-                        "address1": order_data.get("shipping_address", {}).get("address1", ""),
-                        "address2": order_data.get("shipping_address", {}).get("address2"),
-                        "city": order_data.get("shipping_address", {}).get("city", ""),
-                        "postcode": order_data.get("shipping_address", {}).get("postcode", ""),
-                        "country": order_data.get("shipping_address", {}).get("country", "ES")
-                    },
-                    totals={
-                        "goods": order_data.get("total_amount", 0),
-                        "shipping": order_data.get("shipping_cost", 0)
-                    },
-                    estado_mirakl=order_data.get("status", "PENDING"),
-                    estado_tipsa="PENDING"
+                    recipient_name=order_data.get("customer_name", ""),
+                    recipient_address=order_data.get("shipping_address", {}).get("address1", ""),
+                    recipient_city=order_data.get("shipping_address", {}).get("city", ""),
+                    recipient_postal_code=order_data.get("shipping_address", {}).get("postcode", ""),
+                    recipient_country=order_data.get("shipping_address", {}).get("country", "ES"),
+                    recipient_contact=order_data.get("customer_name", ""),
+                    recipient_phone=order_data.get("customer_phone", ""),
+                    recipient_email=order_data.get("customer_email", ""),
+                    cash_on_delivery=str(order_data.get("total_amount", 0)),
+                    mirakl_status=order_data.get("status", "PENDING"),
+                    tipsa_status="PENDING"
                 )
                 
                 order_storage.store_order(order)
@@ -392,11 +376,11 @@ async def export_orders_csv(
                 f"{order.carrier_name or ''},"
                 f"{order.synced_to_mirakl},"
                 f"{order.synced_to_carrier},"
-                f"{order_data.buyer.name},"
-                f"{order_data.totals.goods},"
-                f"{order_data.totals.currency or 'EUR'},"
-                f"{order_data.shipping.city},"
-                f"{order_data.shipping.country}"
+                f"{order_data.recipient_name},"
+                f"{order_data.cash_on_delivery},"
+                f"{'EUR'},"
+                f"{order_data.recipient_city},"
+                f"{order_data.recipient_country}"
             )
         
         csv_content = "\n".join(csv_lines)
@@ -439,34 +423,20 @@ async def create_test_orders(
             # Create test order data
             test_order = OrderStandard(
                 order_id=order_id,
+                reference=order_id,
                 created_at=datetime.now(),
-                marketplace="test",
-                items=[
-                    OrderItem(
-                        sku=f"SKU-{i+1}",
-                        name=f"Test Product {i+1}",
-                        qty=1,
-                        unit_price=10.0 + i * 5.0
-                    )
-                ],
-                buyer=Buyer(
-                    name=f"Test Customer {i+1}",
-                    email=f"customer{i+1}@test.com",
-                    phone="+34123456789"
-                ),
-                shipping=ShippingAddress(
-                    name=f"Test Customer {i+1}",
-                    address1=f"Test Street {i+1}",
-                    city="Madrid",
-                    postal_code="28001",
-                    country="ES"
-                ),
-                totals=OrderTotals(
-                    goods=10.0 + i * 5.0,
-                    total=10.0 + i * 5.0,
-                    currency="EUR"
-                ),
-                status="SHIPPING"
+                status="SHIPPING",
+                recipient_name=f"Test Customer {i+1}",
+                recipient_address=f"Test Street {i+1}",
+                recipient_city="Madrid",
+                recipient_postal_code="28001",
+                recipient_country="ES",
+                recipient_contact=f"Test Customer {i+1}",
+                recipient_phone="+34123456789",
+                recipient_email=f"customer{i+1}@test.com",
+                product_name=f"Test Product {i+1}",
+                cash_on_delivery=str(10.0 + i * 5.0),
+                weight_kg="0.5"
             )
             
             # Store the order

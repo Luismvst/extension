@@ -62,18 +62,51 @@ class OrderTotals(BaseModel):
 
 
 class OrderStandard(BaseModel):
-    """Standardized order model"""
-    order_id: str = Field(..., min_length=1, description="Order ID")
+    """Standardized order model - similar to Mirakl format but in English"""
+    # Core identification
+    order_id: str = Field(..., description="Internal order ID")
+    reference: str = Field(..., description="Mirakl order reference")
     created_at: datetime = Field(..., description="Order creation date")
     status: str = Field(..., description="Order status")
-    items: List[OrderItem] = Field(..., min_items=1, description="Order items")
-    buyer: Buyer = Field(..., description="Buyer information")
-    shipping: ShippingAddress = Field(..., description="Shipping address")
-    totals: OrderTotals = Field(..., description="Order totals")
+    
+    # Recipient information
+    recipient_name: str = Field(..., description="Recipient name")
+    recipient_address: str = Field(..., description="Recipient address")
+    recipient_city: str = Field(..., description="Recipient city")
+    recipient_postal_code: str = Field(..., description="Recipient postal code")
+    recipient_country: str = Field(..., description="Recipient country")
+    recipient_contact: Optional[str] = Field(None, description="Contact person")
+    recipient_phone: Optional[str] = Field(None, description="Phone number")
+    recipient_email: Optional[str] = Field(None, description="Email address")
+    recipient_tax_id: Optional[str] = Field(None, description="Recipient tax ID")
+    
+    # Package information
+    packages: Optional[str] = Field("1", description="Number of packages")
+    weight_kg: Optional[str] = Field("0.1", description="Weight in kg")
+    volume: Optional[str] = Field(None, description="Volume")
+    package_type: Optional[str] = Field(None, description="Package type")
+    
+    # Product information
+    product_name: Optional[str] = Field(None, description="Product name")
+    shipping_cost: Optional[str] = Field("0.00", description="Shipping cost")
+    cash_on_delivery: Optional[str] = Field("0.00", description="Cash on delivery amount")
+    
+    # Customer information
+    customer_name: Optional[str] = Field(None, description="Customer name")
+    customer_code: Optional[str] = Field(None, description="Customer code")
+    customer_department: Optional[str] = Field(None, description="Customer department")
+    
+    # Additional fields
+    observations: Optional[str] = Field("", description="Observations")
+    deferred_date: Optional[str] = Field(None, description="Deferred date")
+    return_flag: Optional[str] = Field("N", description="Return flag")
+    return_confirmation: Optional[str] = Field("N", description="Return confirmation")
+    multi_reference: Optional[str] = Field("", description="Multi-reference")
+    date: Optional[str] = Field(None, description="Date")
     
     # Status tracking fields
-    estado_mirakl: Optional[str] = Field(None, description="Mirakl order status")
-    estado_tipsa: Optional[str] = Field(None, description="TIPSA order status")
+    mirakl_status: Optional[str] = Field(None, description="Mirakl order status")
+    tipsa_status: Optional[str] = Field(None, description="TIPSA order status")
     tracking_number: Optional[str] = Field(None, description="Tracking number")
     carrier_code: Optional[str] = Field(None, description="Carrier code")
     carrier_name: Optional[str] = Field(None, description="Carrier name")
@@ -87,11 +120,39 @@ class OrderStandard(BaseModel):
             raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
         return v.upper()
     
-    @validator('items')
-    def validate_items(cls, v):
-        if not v:
-            raise ValueError('At least one item is required')
-        return v
+    @validator('recipient_country')
+    def validate_country(cls, v):
+        return v.upper()
+
+
+class MiraklProductData(BaseModel):
+    """Mirakl product data model with specific columns"""
+    referencia: str = Field(..., description="Order reference")
+    nombre_consignatario: str = Field(..., description="Recipient name")
+    direccion_consignatario: str = Field(..., description="Recipient address")
+    poblacion_consignatario: str = Field(..., description="Recipient city")
+    codigo_postal_consignatario: str = Field(..., description="Recipient postal code")
+    pais_consignatario: str = Field(..., description="Recipient country")
+    contacto_consignatario: Optional[str] = Field(None, description="Contact person")
+    telefono_consignatario: Optional[str] = Field(None, description="Phone number")
+    bultos: Optional[str] = Field(None, description="Number of packages")
+    kilos: Optional[str] = Field(None, description="Weight in kg")
+    volumen: Optional[str] = Field(None, description="Volume")
+    portes: Optional[str] = Field(None, description="Shipping cost")
+    producto: Optional[str] = Field(None, description="Product name")
+    reembolso: Optional[str] = Field(None, description="Cash on delivery amount")
+    fecha_aplazada: Optional[str] = Field(None, description="Deferred date")
+    observaciones1: Optional[str] = Field(None, description="Observations 1")
+    email_destino: Optional[str] = Field(None, description="Destination email")
+    tipo_bultos: Optional[str] = Field(None, description="Package type")
+    departamento_cliente: Optional[str] = Field(None, description="Customer department")
+    devolucion_conforme: Optional[str] = Field(None, description="Return confirmation")
+    fecha: Optional[str] = Field(None, description="Date")
+    nif_consignatario: Optional[str] = Field(None, description="Recipient tax ID")
+    nombre_cliente: Optional[str] = Field(None, description="Customer name")
+    retorno: Optional[str] = Field(None, description="Return flag")
+    codigo_cliente: Optional[str] = Field(None, description="Customer code")
+    multireferencia: Optional[str] = Field(None, description="Multi-reference")
 
 
 class TIPSAOrder(BaseModel):
@@ -101,12 +162,18 @@ class TIPSAOrder(BaseModel):
     cp: str = Field(..., description="Postal code")
     poblacion: str = Field(..., description="City")
     pais: str = Field(..., description="Country code")
-    contacto: str = Field(..., description="Contact name")
+    contacto: str = Field("", description="Contact name")
     telefono: str = Field("", description="Phone number")
     email: str = Field("", description="Email address")
     referencia: str = Field(..., description="Order reference")
-    peso: str = Field(..., description="Weight")
-    servicio: str = Field(..., description="Service type")
+    peso: str = Field("0.1", description="Weight")
+    servicio: str = Field("ESTANDAR", description="Service type")
+    bultos: str = Field("1", description="Number of packages")
+    observaciones: str = Field("", description="Observations")
+    reembolso: str = Field("0.00", description="Cash on delivery amount")
+    nif_consignatario: str = Field("", description="Recipient tax ID")
+    codigo_cliente: str = Field("", description="Customer code")
+    multireferencia: str = Field("", description="Multi-reference")
     
     @validator('pais')
     def validate_country(cls, v):
@@ -149,8 +216,7 @@ class ShipmentRequest(BaseModel):
     carrier: str = Field(..., description="Carrier name")
     service: Optional[str] = Field(None, description="Service type")
     
-
-
+    
 class ShipmentResponse(BaseModel):
     """Response model for shipment creation"""
     success: bool = Field(..., description="Shipment creation success status")

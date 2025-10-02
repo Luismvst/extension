@@ -2,7 +2,7 @@
   "info": {
     "name": "Mirakl‑TIPSA Orchestrator API (Updated)",
     "_postman_id": "mt-1759171601",
-    "description": "Updated collection with all current endpoints from the backend code. Variables: {{baseUrl}}, {{token}}, {{carrier}}, {{expedition_id}}, {{order_id}}, {{webhook_secret}}.",
+    "description": "Updated collection with all current endpoints from the backend code. Uses new OrderStandard format with recipient_* fields. Variables: {{baseUrl}}, {{token}}, {{carrier}}, {{expedition_id}}, {{order_id}}, {{webhook_secret}}. Login uses email/password format.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -154,7 +154,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"email\": \"test@example.com\", \"password\": \"test123\"}"
+              "raw": "{\"email\": \"admin@test.com\", \"password\": \"admin123\"}"
             }
           },
           "event": [
@@ -348,7 +348,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"orders\": [{\"order_id\": \"MIR-001\", \"created_at\": \"2025-01-01T10:00:00\", \"status\": \"PENDING\", \"items\": [{\"sku\": \"SKU001\", \"name\": \"Producto Test\", \"qty\": 1, \"unit_price\": 45.99}], \"buyer\": {\"name\": \"Juan Perez\", \"email\": \"juan@example.com\"}, \"shipping\": {\"name\": \"Juan Perez\", \"address1\": \"Calle Mayor 123\", \"city\": \"Madrid\", \"postcode\": \"28001\", \"country\": \"ES\"}, \"totals\": {\"goods\": 45.99, \"shipping\": 0}}], \"carrier\": \"{{carrier}}\", \"service\": \"ESTANDAR\"}"
+              "raw": "{\"orders\": [{\"order_id\": \"MIR-001\", \"reference\": \"MIR-001\", \"created_at\": \"2025-01-01T10:00:00\", \"status\": \"PENDING\", \"recipient_name\": \"Juan Perez\", \"recipient_address\": \"Calle Mayor 123\", \"recipient_city\": \"Madrid\", \"recipient_postal_code\": \"28001\", \"recipient_country\": \"ES\", \"recipient_contact\": \"Juan Perez\", \"recipient_phone\": \"+34612345678\", \"recipient_email\": \"juan@example.com\", \"product_name\": \"Producto Test\", \"cash_on_delivery\": \"45.99\", \"weight_kg\": \"0.5\", \"packages\": \"1\"}], \"carrier\": \"{{carrier}}\", \"service\": \"ESTANDAR\"}"
             }
           },
           "event": [
@@ -706,7 +706,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"order_id\": \"MIR-001\", \"created_at\": \"2025-01-01T10:00:00\", \"status\": \"PENDING\", \"items\": [{\"sku\": \"SKU001\", \"name\": \"Producto Test\", \"qty\": 1, \"unit_price\": 45.99}], \"buyer\": {\"name\": \"Juan Perez\", \"email\": \"juan@example.com\"}, \"shipping\": {\"name\": \"Juan Perez\", \"address1\": \"Calle Mayor 123\", \"city\": \"Madrid\", \"postcode\": \"28001\", \"country\": \"ES\"}, \"totals\": {\"goods\": 45.99, \"shipping\": 0}}"
+              "raw": "{\"order_id\": \"MIR-001\", \"reference\": \"MIR-001\", \"created_at\": \"2025-01-01T10:00:00\", \"status\": \"PENDING\", \"recipient_name\": \"Juan Perez\", \"recipient_address\": \"Calle Mayor 123\", \"recipient_city\": \"Madrid\", \"recipient_postal_code\": \"28001\", \"recipient_country\": \"ES\", \"recipient_contact\": \"Juan Perez\", \"recipient_phone\": \"+34612345678\", \"recipient_email\": \"juan@example.com\", \"product_name\": \"Producto Test\", \"cash_on_delivery\": \"45.99\", \"weight_kg\": \"0.5\", \"packages\": \"1\"}"
             }
           },
           "event": [
@@ -739,7 +739,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"order_id\": \"{{order_id}}\", \"estado_tipsa\": \"SENT\", \"tracking_number\": \"TRK123456789\", \"carrier_code\": \"tipsa\", \"carrier_name\": \"TIPSA\", \"synced_to_carrier\": true}"
+              "raw": "{\"order_id\": \"{{order_id}}\", \"tipsa_status\": \"SENT\", \"tracking_number\": \"TRK123456789\", \"carrier_code\": \"tipsa\", \"carrier_name\": \"TIPSA\", \"synced_to_carrier\": true}"
             }
           },
           "event": [

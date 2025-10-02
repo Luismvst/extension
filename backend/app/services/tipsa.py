@@ -20,17 +20,23 @@ def map_order_to_tipsa(order: OrderStandard, default_service: str = "ESTANDAR") 
         TIPSA formatted order
     """
     return TIPSAOrder(
-        destinatario=order.shipping.name,
-        direccion=_format_address(order.shipping),
-        cp=order.shipping.postcode,
-        poblacion=order.shipping.city,
-        pais=order.shipping.country,
-        contacto=order.buyer.name,
-        telefono=order.buyer.phone or "",
-        email=order.buyer.email or "",
-        referencia=order.order_id,
-        peso=_calculate_weight(order),
-        servicio=default_service
+        destinatario=order.recipient_name,
+        direccion=order.recipient_address,
+        cp=order.recipient_postal_code,
+        poblacion=order.recipient_city,
+        pais=order.recipient_country,
+        contacto=order.recipient_contact or order.recipient_name,
+        telefono=order.recipient_phone or "",
+        email=order.recipient_email or "",
+        referencia=order.reference,
+        peso=order.weight_kg,
+        servicio=default_service,
+        bultos=order.packages or "1",
+        observaciones=order.observations or "",
+        reembolso=order.cash_on_delivery or "0.00",
+        nif_consignatario=order.recipient_tax_id or "",
+        codigo_cliente=order.customer_code or "",
+        multireferencia=order.multi_reference or ""
     )
 
 
@@ -50,7 +56,7 @@ def map_orders_to_tipsa(orders: List[OrderStandard], default_service: str = "EST
 
 def generate_tipsa_csv(orders: List[OrderStandard], default_service: str = "ESTANDAR") -> str:
     """
-    Generate TIPSA CSV content
+    Generate TIPSA CSV content from OrderStandard (legacy method)
     
     Args:
         orders: List of standardized orders
@@ -64,7 +70,7 @@ def generate_tipsa_csv(orders: List[OrderStandard], default_service: str = "ESTA
     
     tipsa_orders = map_orders_to_tipsa(orders, default_service)
     
-    # CSV headers
+    # Extended CSV headers for new fields
     headers = [
         "destinatario",
         "direccion", 
@@ -76,7 +82,13 @@ def generate_tipsa_csv(orders: List[OrderStandard], default_service: str = "ESTA
         "email",
         "referencia",
         "peso",
-        "servicio"
+        "servicio",
+        "bultos",
+        "observaciones",
+        "reembolso",
+        "nif_consignatario",
+        "codigo_cliente",
+        "multireferencia"
     ]
     
     # Generate CSV content
@@ -94,7 +106,13 @@ def generate_tipsa_csv(orders: List[OrderStandard], default_service: str = "ESTA
             order.email,
             order.referencia,
             order.peso,
-            order.servicio
+            order.servicio,
+            order.bultos,
+            order.observaciones,
+            order.reembolso,
+            order.nif_consignatario,
+            order.codigo_cliente,
+            order.multireferencia
         ]
         csv_lines.append(";".join(row))
     
@@ -212,23 +230,6 @@ def process_orders_mapping(orders: List[OrderStandard], format_type: str = "csv"
         )
 
 
-def _format_address(shipping) -> str:
-    """Format shipping address for TIPSA"""
-    parts = [shipping.address1]
-    
-    if shipping.address2:
-        parts.append(shipping.address2)
-    
-    return ", ".join(parts)
-
-
-def _calculate_weight(order: OrderStandard) -> str:
-    """Calculate package weight (simplified)"""
-    total_items = sum(item.qty for item in order.items)
-    base_weight = 0.5  # Base weight per item in kg
-    total_weight = total_items * base_weight
-    
-    return f"{max(total_weight, 0.1):.1f}"  # Minimum 0.1kg
 
 
 def _is_valid_postal_code(cp: str) -> bool:
