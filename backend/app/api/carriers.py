@@ -27,10 +27,6 @@ from ..core.settings import settings
 # Create router
 router = APIRouter(prefix="/api/v1/carriers", tags=["carriers"])
 
-
-
-
-
 # Initialize adapters
 tipsa_adapter = TipsaAdapter()
 ontime_adapter = OnTimeAdapter()

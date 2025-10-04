@@ -45,8 +45,17 @@ async def get_mirakl_orders(
     start_time = time.time()
     
     try:
+        logger.info(f"🔍 DEBUG API: get_mirakl_orders called with status={status}, limit={limit}, offset={offset}")
+        
         # Get orders from Mirakl
         result = await mirakl_adapter.get_orders(status, limit, offset)
+        
+        logger.info(f"🔍 DEBUG API: mirakl_adapter.get_orders returned {len(result.get('orders', []))} orders")
+        if result.get('orders'):
+            first_order = result['orders'][0]
+            logger.info(f"🔍 DEBUG API: First order keys: {list(first_order.keys())}")
+            logger.info(f"🔍 DEBUG API: First order has recipient_name: {'recipient_name' in first_order}")
+            logger.info(f"🔍 DEBUG API: First order has buyer: {'buyer' in first_order}")
         
         # Log operation
         duration_ms = int((time.time() - start_time) * 1000)
