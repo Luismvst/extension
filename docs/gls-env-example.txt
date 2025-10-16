@@ -1,0 +1,28 @@
+# =============================================================================
+# GLS ShipIT Sandbox Configuration
+# =============================================================================
+# Copiar este contenido a backend/.env
+#
+# IMPORTANTE: Para obtener credenciales de sandbox:
+# 1. Contacta con GLS para solicitar acceso al sandbox
+# 2. Te proporcionarán client_id y client_secret para OAuth2
+# 3. También necesitarás un ContactID válido para el remitente
+# =============================================================================
+
+# GLS ShipIT - Sandbox
+GLS_BASE_URL=https://api-sandbox.gls-group.net/shipit-farm/v1/backend
+GLS_AUTH_URL=https://api-sandbox.gls-group.net/oauth2/v2/token
+GLS_CLIENT_ID=TU_CLIENT_ID_AQUI
+GLS_CLIENT_SECRET=TU_CLIENT_SECRET_AQUI
+GLS_CONTACT_ID=276002471
+GLS_LABEL_FORMAT=PDF
+GLS_TEMPLATE_SET=NONE
+GLS_USE_OAUTH=true
+GLS_MOCK_MODE=false
+
+# Si no tienes credenciales, usa modo MOCK:
+# GLS_MOCK_MODE=true
+
+# Mirakl (mantener en mock para testing)
+MIRAKL_MOCK_MODE=true
+

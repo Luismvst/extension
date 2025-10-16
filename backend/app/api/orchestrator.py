@@ -18,10 +18,12 @@ from ..adapters.carriers.seur import SeurAdapter
 from ..adapters.carriers.correosex import CorreosExAdapter
 from ..adapters.carriers.dhl import DHLAdapter
 from ..adapters.carriers.ups import UPSAdapter
+from ..adapters.carriers.gls import GlsAdapter
 from ..rules.selector import select_carrier, get_carrier_info
 from ..core.auth import get_current_user
 from ..utils.csv_ops_logger import csv_ops_logger
 from ..core.unified_order_logger import unified_order_logger
+from ..services.gls_tracking_poller import gls_tracking_poller
 import logging
 
 # Create logger for this module
@@ -38,6 +40,7 @@ seur_adapter = SeurAdapter()
 correosex_adapter = CorreosExAdapter()
 dhl_adapter = DHLAdapter()
 ups_adapter = UPSAdapter()
+gls_adapter = GlsAdapter()
 
 # Carrier mapping
 CARRIER_ADAPTERS = {
@@ -46,7 +49,8 @@ CARRIER_ADAPTERS = {
     "seur": seur_adapter,
     "correosex": correosex_adapter,
     "dhl": dhl_adapter,
-    "ups": ups_adapter
+    "ups": ups_adapter,
+    "gls": gls_adapter
 }
 
 
@@ -73,7 +77,7 @@ async def load_orders_and_create_shipments(
     
     try:
         # Step 1: Get orders from Mirakl
-        mirakl_result = await mirakl_adapter.get_orders(status="PENDING", limit=100, offset=0) # TODO adaptar esto
+        mirakl_result = await mirakl_adapter.get_orders(order_state_codes="SHIPPING", limit=100, offset=0) # TODO adaptar esto
         orders = mirakl_result.get("orders", [])
         
         if not orders:
@@ -783,4 +787,545 @@ async def get_orders_view(
         }
         
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/test-correosex-shipment")
+async def test_correosex_shipment(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Create a test shipment with Correos Express API.
+    
+    This endpoint creates a fictional order to test the Correos Express integration
+    with OAuth 2.0 authentication.
+    
+    Args:
+        current_user: Authenticated user
+        
+    Returns:
+        Shipment creation result
+    """
+    start_time = time.time()
+    
+    # Create a fictional order for testing
+    test_order = {
+        "order_id": f"TEST-CORREOS-{int(time.time())}",
+        "customer_name": "Juan Pérez García",
+        "customer_email": "juan.perez@example.com",
+        "customer_phone": "+34612345678",
+        "total_amount": 45.99,
+        "currency": "EUR",
+        "weight": 2.5,
+        "shipping_address": {
+            "name": "Juan Pérez García",
+            "street": "Calle Mayor 123, 2º B",
+            "city": "Madrid",
+            "postal_code": "28001",
+            "province": "Madrid",
+            "country": "ES",
+            "phone": "+34612345678",
+            "email": "juan.perez@example.com"
+        },
+        "observations": "Pedido de prueba - Correos Express API"
+    }
+    
+    try:
+        # Create shipment with Correos Express
+        result = await correosex_adapter.create_shipment(test_order)
+        
+        # Log the operation
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.info(f"Test shipment created with Correos Express, duration_ms={duration_ms}")
+        
+        return {
+            "success": True,
+            "message": "Test shipment created successfully",
+            "order_id": test_order["order_id"],
+            "shipment": result,
+            "carrier": "correosex",
+            "duration_ms": duration_ms,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"Error creating test shipment with Correos Express: {str(e)}")
+        
+        return {
+            "success": False,
+            "message": f"Error creating test shipment: {str(e)}",
+            "order_id": test_order["order_id"],
+            "carrier": "correosex",
+            "duration_ms": duration_ms,
+            "error": str(e),
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+
+def _order_to_gls_payload(order: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Intenta mapear tanto el mock de Mirakl (OrderStandard)
+    como una respuesta real simplificada a lo que espera GlsAdapter.create_shipment.
+    """
+    # intentamos campos "standard"
+    order_id = order.get("order_id") or order.get("id") or order.get("Referencia")
+    customer_name = order.get("customer_name") or order.get("recipient_name") or order.get("Nombre Consignatario")
+    customer_email = order.get("customer_email") or order.get("recipient_email") or order.get("Email Destino")
+    weight = (
+        order.get("weight")
+        or order.get("weight_kg")
+        or order.get("Kilos")
+        or 0.5
+    )
+    cod_amount = (
+        order.get("cash_on_delivery")
+        or order.get("Reembolso")
+        or 0.0
+    )
+    currency = order.get("currency") or "EUR"
+
+    addr = order.get("shipping_address") or {}
+    if not addr and all(order.get(k) for k in ["recipient_address","recipient_city","recipient_postal_code","recipient_country"]):
+        # OrderStandard mock
+        addr = {
+            "address1": order.get("recipient_address"),
+            "city": order.get("recipient_city"),
+            "postal_code": order.get("recipient_postal_code"),
+            "country": order.get("recipient_country"),
+            "name": order.get("recipient_name"),
+            "phone": order.get("recipient_phone"),
+            "email": order.get("recipient_email"),
+        }
+
+    payload = {
+        "order_id": str(order_id),
+        "customer_name": customer_name,
+        "customer_email": customer_email,
+        "weight": float(weight),
+        "cash_on_delivery": float(cod_amount) if cod_amount else 0.0,
+        "currency": currency,
+        "shipping_address": {
+            "name": customer_name,
+            "address1": addr.get("address1") or addr.get("street") or "",
+            "address2": addr.get("address2") or "",
+            "city": addr.get("city") or "",
+            "postal_code": addr.get("postal_code") or addr.get("zip") or "",
+            "country": addr.get("country") or addr.get("country_code") or "ES",
+            "phone": addr.get("phone"),
+            "email": addr.get("email") or customer_email,
+            # opcionales que el adapter de GLS sabe leer:
+            "street_number": addr.get("street_number"),
+        },
+        # Señal para flex delivery si quieres; comentalo si no aplica:
+        # "delivery_flex": True,
+        # "service": "PARCEL" | "EXPRESS"
+    }
+    return payload
+
+
+@router.post("/mirakl-to-gls")
+async def mirakl_to_gls_simple(
+    limit: int = 50,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Orquestador mínimo: coge órdenes de Mirakl y crea envíos en GLS ShipIT.
+    - Lee órdenes en estado SHIPPING (ajusta si hace falta).
+    - Mapea campos mínimos obligatorios.
+    - Crea envío en GLS (etiqueta mediante ReturnLabels).
+    """
+    t0 = time.time()
+
+    try:
+        # 1) Traer pedidos de Mirakl
+        mirakl_res = await mirakl_adapter.get_orders(order_state_codes="SHIPPING", limit=limit, offset=0)
+        orders = mirakl_res.get("orders", [])
+        if not orders:
+            return {
+                "success": True,
+                "message": "No hay pedidos en Mirakl para procesar",
+                "orders_processed": 0,
+                "shipments_created": 0,
+                "shipments": [],
+            }
+
+        # 2) Transformar a payload de GLS
+        gls_payloads: List[Dict[str, Any]] = []
+        for o in orders:
+            try:
+                gls_payloads.append(_order_to_gls_payload(o))
+            except Exception as ex:
+                logger.warning(f"No se pudo transformar pedido {o.get('order_id')}: {ex}")
+
+        if not gls_payloads:
+            return {
+                "success": True,
+                "message": "Pedidos obtenidos pero ninguno transformable a GLS",
+                "orders_processed": len(orders),
+                "shipments_created": 0,
+                "shipments": [],
+            }
+
+        # 3) Crear envíos en GLS (loop interno)
+        bulk_res = await gls_adapter.create_shipments_bulk(gls_payloads)
+        shipments = bulk_res.get("shipments", [])
+        
+        # 4) Actualizar Mirakl con tracking info (OR23 + OR24)
+        mirakl_updates = []
+        for i, shipment in enumerate(shipments):
+            if i >= len(orders):
+                break
+                
+            order = orders[i]
+            order_id = order.get("order_id") or order.get("id")
+            track_id = shipment.get("track_id")
+            
+            if not order_id or not track_id:
+                logger.warning(f"Missing order_id or track_id for shipment {i}")
+                continue
+                
+            try:
+                # Actualizar tracking en Mirakl (OR23 + OR24)
+                mirakl_result = await mirakl_adapter.update_order_tracking(
+                    order_id=str(order_id),
+                    tracking_number=track_id,
+                    carrier_code="gls",
+                    carrier_name="GLS",
+                    validate_shipment=True  # También ejecuta OR24
+                )
+                
+                mirakl_updates.append({
+                    "order_id": order_id,
+                    "tracking_number": track_id,
+                    "status": "updated",
+                    "mirakl_response": mirakl_result
+                })
+                
+                # Log en unified logger
+                unified_order_logger.upsert_order(
+                    str(order_id),
+                    {
+                        "marketplace": "mirakl",
+                        "carrier": "gls",
+                        "carrier_code": "gls",
+                        "tracking_number": track_id,
+                        "internal_state": "MIRAKL_OK",
+                        "carrier_status": "CREATED",
+                        "last_event": "GLS_SHIPMENT_CREATED",
+                        "last_event_at": datetime.utcnow().isoformat()
+                    }
+                )
+                
+                logger.info(f"[MIRAKL-GLS] Updated Mirakl for order {order_id} with tracking {track_id}")
+                
+            except Exception as e:
+                logger.error(f"[MIRAKL-GLS] Failed to update Mirakl for order {order_id}: {e}", exc_info=True)
+                mirakl_updates.append({
+                    "order_id": order_id,
+                    "tracking_number": track_id,
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        duration_ms = int((time.time() - t0) * 1000)
+
+        # 5) Respuesta
+        return {
+            "success": True,
+            "message": f"Procesadas {len(orders)} órdenes de Mirakl; creados {len(shipments)} envíos en GLS; {len(mirakl_updates)} actualizaciones a Mirakl",
+            "orders_processed": len(orders),
+            "shipments_created": len(shipments),
+            "mirakl_updates": mirakl_updates,
+            "shipments": shipments,
+            "duration_ms": duration_ms,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+        }
+
+    except Exception as e:
+        logger.exception("Fallo en mirakl_to_gls_simple")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/test-gls-direct")
+async def test_gls_direct(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Función de prueba directa para GLS ShipIT API.
+    Envía datos hardcodeados para probar la conectividad y respuesta de la API.
+    """
+    t0 = time.time()
+    
+    # Datos de prueba hardcodeados para GLS
+    test_order = {
+        "order_id": f"TEST-GLS-{int(time.time())}",
+        "customer_name": "Juan Pérez García",
+        "customer_email": "juan.perez@example.com",
+        "customer_phone": "+34612345678",
+        "weight": 2.5,
+        "cash_on_delivery": 0.0,
+        "currency": "EUR",
+        "shipping_address": {
+            "name": "Juan Pérez García",
+            "address1": "Calle Mayor 123",
+            "address2": "2º B",  # StreetNumber para GLS
+            "city": "Madrid",
+            "postal_code": "28001",
+            "country": "ES",
+            "phone": "+34612345678",
+            "email": "juan.perez@example.com",
+            "street_number": "123"  # Campo específico para GLS
+        },
+        "service": "PARCEL",  # PARCEL o EXPRESS
+        "delivery_flex": False,
+        "observations": "Pedido de prueba - GLS ShipIT API"
+    }
+    
+    try:
+        logger.info(f"[TEST-GLS] Iniciando prueba directa con orden: {test_order['order_id']}")
+        
+        # Crear envío directamente con GLS
+        result = await gls_adapter.create_shipment(test_order)
+        
+        duration_ms = int((time.time() - t0) * 1000)
+        
+        logger.info(f"[TEST-GLS] Prueba completada exitosamente, duration_ms={duration_ms}")
+        
+        return {
+            "success": True,
+            "message": "Prueba directa de GLS completada exitosamente",
+            "test_order": test_order,
+            "gls_response": result,
+            "carrier": "gls",
+            "duration_ms": duration_ms,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "debug_info": {
+                "adapter_mode": "mock" if gls_adapter.is_mock_mode else "real",
+                "base_url": gls_adapter.base_url,
+                "endpoint_used": gls_adapter.endpoints["shipments"]
+            }
+        }
+        
+    except Exception as e:
+        duration_ms = int((time.time() - t0) * 1000)
+        logger.error(f"[TEST-GLS] Error en prueba directa: {str(e)}", exc_info=True)
+        
+        return {
+            "success": False,
+            "message": f"Error en prueba directa de GLS: {str(e)}",
+            "test_order": test_order,
+            "carrier": "gls",
+            "duration_ms": duration_ms,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "debug_info": {
+                "adapter_mode": "mock" if gls_adapter.is_mock_mode else "real",
+                "base_url": gls_adapter.base_url,
+                "endpoint_used": gls_adapter.endpoints["shipments"]
+            }
+        }
+
+
+@router.post("/gls/tracking-poller/start")
+async def start_gls_tracking_poller(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Inicia el servicio de polling de tracking de GLS.
+    
+    El poller consulta periódicamente el estado de envíos GLS activos
+    y actualiza Mirakl cuando detecta cambios.
+    """
+    try:
+        await gls_tracking_poller.start()
+        return {
+            "success": True,
+            "message": "GLS tracking poller started",
+            "poll_interval_seconds": gls_tracking_poller.poll_interval,
+            "status": "running"
+        }
+    except Exception as e:
+        logger.error(f"Error starting GLS tracking poller: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/gls/tracking-poller/stop")
+async def stop_gls_tracking_poller(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Detiene el servicio de polling de tracking de GLS.
+    """
+    try:
+        await gls_tracking_poller.stop()
+        return {
+            "success": True,
+            "message": "GLS tracking poller stopped",
+            "status": "stopped"
+        }
+    except Exception as e:
+        logger.error(f"Error stopping GLS tracking poller: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/gls/tracking-poller/status")
+async def get_gls_tracking_poller_status(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Obtiene el estado actual del servicio de polling de GLS.
+    """
+    return {
+        "success": True,
+        "running": gls_tracking_poller.running,
+        "poll_interval_seconds": gls_tracking_poller.poll_interval,
+        "adapter_mode": "mock" if gls_adapter.is_mock_mode else "real"
+    }
+
+
+@router.post("/gls/tracking-poller/poll-once")
+async def poll_gls_tracking_once(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Ejecuta un ciclo de polling manualmente (útil para testing).
+    """
+    try:
+        result = await gls_tracking_poller.poll_once()
+        return {
+            "success": True,
+            "message": "Manual polling completed",
+            "result": result
+        }
+    except Exception as e:
+        logger.error(f"Error in manual GLS tracking poll: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/gls/tracking-poller/poll-order/{order_id}")
+async def poll_gls_tracking_for_order(
+    order_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Consulta tracking de una orden específica y actualiza Mirakl.
+    
+    Args:
+        order_id: ID de la orden en Mirakl
+    """
+    try:
+        result = await gls_tracking_poller.poll_specific_order(order_id)
+        return {
+            "success": True,
+            "message": f"Tracking polled for order {order_id}",
+            "result": result
+        }
+    except Exception as e:
+        logger.error(f"Error polling tracking for order {order_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/gls/webhook/tracking-update")
+async def gls_tracking_webhook(
+    webhook_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Webhook para recibir actualizaciones de tracking de GLS (o agregadores como AfterShip/TrackingMore).
+    
+    Este endpoint está preparado para uso futuro cuando se integre con un servicio
+    de webhooks de terceros que monitoree GLS.
+    
+    Formato esperado del webhook_data:
+    {
+        "tracking_number": "GLS1234567",
+        "status": "DELIVERED",
+        "events": [...],
+        "order_reference": "order_id_mirakl"
+    }
+    """
+    try:
+        tracking_number = webhook_data.get("tracking_number")
+        status = webhook_data.get("status")
+        order_reference = webhook_data.get("order_reference")
+        
+        if not tracking_number or not status:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing required fields: tracking_number, status"
+            )
+        
+        logger.info(f"[GLS WEBHOOK] Received tracking update: {tracking_number} -> {status}")
+        
+        # Buscar orden por tracking number o referencia
+        order = None
+        if order_reference:
+            order = unified_order_logger.get_order_by_id(order_reference)
+        
+        if not order:
+            # Buscar por tracking number en todos los pedidos
+            all_orders = unified_order_logger.get_all_orders()
+            for o in all_orders:
+                if o.get("tracking_number") == tracking_number:
+                    order = o
+                    break
+        
+        if not order:
+            logger.warning(f"[GLS WEBHOOK] Order not found for tracking {tracking_number}")
+            return {
+                "success": False,
+                "message": f"Order not found for tracking number {tracking_number}"
+            }
+        
+        # Actualizar estado en unified logger
+        order_id = order.get("mirakl_order_id")
+        unified_order_logger.upsert_order(
+            order_id,
+            {
+                "carrier_status": status,
+                "last_event": f"GLS_WEBHOOK:{status}",
+                "last_event_at": datetime.utcnow().isoformat(),
+                "tracking_events": webhook_data.get("events", [])
+            }
+        )
+        
+        # Actualizar Mirakl si corresponde
+        try:
+            await mirakl_adapter.update_order_tracking(
+                order_id=order_id,
+                tracking_number=tracking_number,
+                carrier_code="gls",
+                carrier_name="GLS",
+                validate_shipment=False
+            )
+            
+            logger.info(f"[GLS WEBHOOK] Updated Mirakl for order {order_id}")
+        except Exception as e:
+            logger.error(f"[GLS WEBHOOK] Failed to update Mirakl: {e}", exc_info=True)
+        
+        # Log webhook event
+        await csv_ops_logger.log(
+            scope="gls_webhook",
+            action="tracking_update",
+            order_id=order_id,
+            carrier="gls",
+            status="OK",
+            message=f"Webhook tracking update: {status}",
+            meta={"tracking_number": tracking_number, "status": status}
+        )
+        
+        return {
+            "success": True,
+            "message": "Tracking update processed",
+            "order_id": order_id,
+            "tracking_number": tracking_number,
+            "status": status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GLS WEBHOOK] Error processing webhook: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

@@ -34,9 +34,10 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 30
     
     # Mirakl API
-    mirakl_api_key: Optional[str] = None
+    mirakl_api_key: Optional[str] = "9d21e1e9-2f8d-4d52-a95c-3d0e0d99a36b"
     mirakl_shop_id: Optional[str] = None
-    mirakl_base_url: str = "https://marketplace.mirakl.net" # https://sandbox.mirakl.net
+    # mirakl_base_url: str = "https://marketplace.mirakl.net" # https://sandbox.mirakl.net
+    mirakl_base_url: str = "https://carrefoures-prod.mirakl.net"
     mirakl_mock_mode: bool = True
     
     # TIPSA API
@@ -70,9 +71,26 @@ class Settings(BaseSettings):
     seur_mock_mode: bool = True
     
     # Correos Express API
-    correosex_api_key: Optional[str] = None
-    correosex_base_url: str = "https://api.correosex.com"
-    correosex_mock_mode: bool = True
+    correosex_client_id: str = "6a0f6d3607f14d3daaa29f0879552e9e"
+    correosex_client_secret: str = "af4D870c233e40ffafEcC61De281D720"
+    correosex_base_url: str = "https://api1.correos.es/admissions/preregister/api/v1"
+    correosex_auth_url: str = "https://api1.correos.es/oauth/token"
+    correosex_redirect_uri: Optional[str] = None
+    correosex_mock_mode: bool = False
+    
+    # GLS ShipIT API
+    gls_base_url: str = "https://api-sandbox.gls-group.net/shipit-farm/v1/backend"
+    gls_auth_url: str = "https://api-sandbox.gls-group.net/oauth2/v2/token"
+    gls_client_id: str = "PGGtqrGTunNpvLejGUnNsAHjidd4gPXV"
+    gls_client_secret: str = "0WAuZI78OOhja41a"
+    gls_username: str = "PGGtqrGTunNpvLejGUnNsAHjidd4gPXV"
+    gls_password: str = "0WAuZI78OOhja41a"
+    gls_contact_id: str = "276002471"
+    gls_label_format: str = "PDF"
+    gls_template_set: str = "NONE"
+    gls_requester: Optional[str] = None
+    gls_use_oauth: bool = True
+    gls_mock_mode: bool = True
     
     # Logging
     log_level: str = "INFO"
