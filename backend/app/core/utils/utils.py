@@ -1,8 +1,8 @@
 # src/core/utils/utils.py
 
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Union
 
-def _csv(value: Optional[Iterable[str] | str]) -> Optional[str]:
+def _csv(value: Optional[Union[Iterable[str], str]]) -> Optional[str]:
     """Convierte listas a CSV; pasa-through si ya es str o None."""
     if value is None:
         return None

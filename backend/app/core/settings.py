@@ -71,7 +71,8 @@ class Settings(BaseSettings):
     seur_mock_mode: bool = True
     
     # Correos Express API
-    correosex_client_id: str = "6a0f6d3607f14d3daaa29f0879552e9e"
+    # Correos Express API
+    correosex_api_key: Optional[str] = None
     correosex_client_secret: str = "af4D870c233e40ffafEcC61De281D720"
     correosex_base_url: str = "https://api1.correos.es/admissions/preregister/api/v1"
     correosex_auth_url: str = "https://api1.correos.es/oauth/token"

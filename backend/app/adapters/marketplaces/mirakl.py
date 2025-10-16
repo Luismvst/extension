@@ -6,9 +6,8 @@ Mirakl marketplace APIs (OR12, ST11, ST12, OR23).
 """
 
 import httpx
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union, Optional, Iterable
 from datetime import datetime
-from typing import Optional, Iterable
 
 from ..interfaces.marketplace import MarketplaceAdapter
 from ...core.settings import settings
